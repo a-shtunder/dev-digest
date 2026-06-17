@@ -200,7 +200,7 @@ export function RunHistory({
               {r.ran_at && <span>{new Date(r.ran_at).toLocaleTimeString()}</span>}
               {tok > 0 && (
                 <span className="mono">
-                  {tok} tok{r.cost_usd != null ? ` · $${r.cost_usd.toFixed(4)}` : ""}
+                  {tok} tok{r.cost_usd != null ? ` · $${r.cost_usd.toFixed(3)}` : ""}
                 </span>
               )}
             </div>

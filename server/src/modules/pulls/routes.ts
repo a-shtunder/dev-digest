@@ -118,6 +118,21 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { id: string; score: number | null }>();
     const sevByReview = new Map<string, SeverityCounts>();
+    // Most recent agent run's cost per PR — one DISTINCT ON query, grouped in JS.
+    const lastRunCostByPr = new Map<string, number | null>();
+    if (prIds.length > 0) {
+      const runRows = await container.db
+        .selectDistinctOn([t.agentRuns.prId], {
+          prId: t.agentRuns.prId,
+          costUsd: t.agentRuns.costUsd,
+        })
+        .from(t.agentRuns)
+        .where(and(eq(t.agentRuns.workspaceId, workspaceId), inArray(t.agentRuns.prId, prIds)))
+        .orderBy(t.agentRuns.prId, desc(t.agentRuns.ranAt));
+      for (const row of runRows) {
+        if (row.prId) lastRunCostByPr.set(row.prId, row.costUsd ?? null);
+      }
+    }
     if (prIds.length > 0) {
       const reviewRows = await container.db
         .select({ id: t.reviews.id, prId: t.reviews.prId, score: t.reviews.score })
@@ -172,6 +187,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         findings_critical: review ? (sev?.critical ?? 0) : null,
         findings_warning: review ? (sev?.warning ?? 0) : null,
         findings_suggestion: review ? (sev?.suggestion ?? 0) : null,
+        last_run_cost_usd: lastRunCostByPr.get(r.id) ?? null,
       };
     });
   });

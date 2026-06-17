@@ -93,6 +93,7 @@
       "score": "Score",
       "findings": "Findings",
       "status": "Status",
+      "cost": "Cost",
       "updated": "Updated"
     },
     "filesCount": "{count} files",

@@ -53,6 +53,10 @@ export const s = {
     gap: 3,
     color,
   }),
+  costCell: {
+    fontSize: 12.5,
+    fontVariantNumeric: "tabular-nums",
+  } satisfies CSSProperties,
   updatedCell: {
     fontSize: 12,
     color: "var(--text-muted)",

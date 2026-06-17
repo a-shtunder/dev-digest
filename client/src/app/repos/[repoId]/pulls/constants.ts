@@ -24,7 +24,7 @@ export const SIZE_COLOR: Record<string, string> = {
 };
 
 /** Grid template for both the header row and PR rows. */
-export const GRID = "1fr 132px 92px 60px 150px 118px 78px";
+export const GRID = "1fr 132px 92px 60px 150px 118px 72px 78px";
 
 /** PrMeta severity-count field per severity bucket (for the FINDINGS column). */
 export const FINDINGS_FIELDS = [
@@ -53,6 +53,7 @@ export const COLUMN_KEYS: string[] = [
   "score",
   "findings",
   "status",
+  "cost",
   "updated",
 ];
 

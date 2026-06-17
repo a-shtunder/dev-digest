@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
@@ -118,17 +118,18 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { id: string; score: number | null }>();
     const sevByReview = new Map<string, SeverityCounts>();
-    // Most recent agent run's cost per PR — one DISTINCT ON query, grouped in JS.
+    // Total accumulated cost across all agent runs per PR — SUM so errored runs
+    // (cost_usd = null) don't zero out the column when they happen to be the latest run.
     const lastRunCostByPr = new Map<string, number | null>();
     if (prIds.length > 0) {
       const runRows = await container.db
-        .selectDistinctOn([t.agentRuns.prId], {
+        .select({
           prId: t.agentRuns.prId,
-          costUsd: t.agentRuns.costUsd,
+          costUsd: sql<number | null>`sum(${t.agentRuns.costUsd})`,
         })
         .from(t.agentRuns)
         .where(and(eq(t.agentRuns.workspaceId, workspaceId), inArray(t.agentRuns.prId, prIds)))
-        .orderBy(t.agentRuns.prId, desc(t.agentRuns.ranAt));
+        .groupBy(t.agentRuns.prId);
       for (const row of runRows) {
         if (row.prId) lastRunCostByPr.set(row.prId, row.costUsd ?? null);
       }

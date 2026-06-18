@@ -3,8 +3,9 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import type { RunSummary, PrCommit, ReviewRecord, FindingRecord } from "@devdigest/shared";
 import { RunCostBadge } from "@/components/RunCostBadge";
+import { FindingsBadgeGroup } from "../../../_components/FindingsBadgeGroup";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -88,12 +89,14 @@ function tsOf(s: string | null | undefined): number {
 export function RunHistory({
   runs,
   commits = [],
+  reviews = [],
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
+  reviews?: ReviewRecord[];
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
   /** Jump to this run's inline review accordion below (clicking the agent name). */
@@ -101,6 +104,13 @@ export function RunHistory({
   onDelete?: (runId: string) => void;
 }) {
   const t = useTranslations("prReview");
+  const findingsByRunId = React.useMemo(() => {
+    const map = new Map<string, FindingRecord[]>();
+    for (const review of reviews) {
+      if (review.run_id) map.set(review.run_id, review.findings ?? []);
+    }
+    return map;
+  }, [reviews]);
   if (runs.length === 0 && commits.length === 0) return null;
 
   const items: TimelineItem[] = [
@@ -190,9 +200,9 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
-                  {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)" }}>
+                  <FindingsBadgeGroup findings={findingsByRunId.get(r.run_id) ?? []} />
+                  {(r.blockers ?? 0) > 0 && <span>{t("runStatus.blockers", { count: r.blockers ?? 0 })}</span>}
                 </div>
               )}
             </div>

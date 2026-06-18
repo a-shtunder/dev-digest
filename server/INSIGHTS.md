@@ -24,6 +24,9 @@ so the next agent/session doesn't relearn it. Append-only — see the
 
 ## Session Notes
 
+### 2026-06-17
+- Added per-severity findings counts to `GET /repos/:id/pulls`: grouped SQL query joining `findings → reviews`, filtered by `kind='review'` and `dismissedAt IS NULL`, grouped by `prId + severity`. Result merged into the existing per-PR aggregation loop. Evidence: `server/src/modules/pulls/routes.ts`.
+
 ### 2026-06-14
 - Re-introduced per-run cost (USD) end-to-end (lesson reversing the earlier removal in `d45ab0d`/`58c6ac7`): `cost_usd` column on `agent_runs` (migration 0010), captured in `run-executor` (was discarding `outcome.costUsd`), surfaced in `RunSummary`/`RunStats`/`PrMeta`.
 - Decision: PR-list COST = sum of the latest review batch via a 120s window heuristic (no batch id in schema). Cost persisted (accurate `outcome.costUsd`), not recomputed; historical runs → null → "—".

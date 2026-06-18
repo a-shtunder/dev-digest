@@ -10,6 +10,7 @@ import { Icon, Badge } from "@devdigest/ui";
 import type { ReviewRecord, Verdict } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
+import { FindingsBadgeGroup } from "../../../_components/FindingsBadgeGroup";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
 
 const VERDICT_COLOR: Record<string, string> = {
@@ -93,10 +94,12 @@ export function ReviewRunAccordion({
             {review.verdict.replace("_", " ")}
           </Badge>
         )}
-        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-          {findings.length} finding{findings.length === 1 ? "" : "s"}
-          {blockers > 0 ? ` · ${blockers} blocker${blockers === 1 ? "" : "s"}` : ""}
-        </span>
+        <FindingsBadgeGroup findings={findings} />
+        {blockers > 0 && (
+          <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+            · {blockers} blocker{blockers === 1 ? "" : "s"}
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         {review.score != null && (
           <Badge mono color="var(--text-secondary)">

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
@@ -169,6 +169,37 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    // Per-severity finding counts per PR (from latest reviews only — all
+    // non-dismissed findings across all reviews for the PR).
+    type SeverityCounts = { CRITICAL: number; WARNING: number; SUGGESTION: number };
+    const findingsByPr = new Map<string, SeverityCounts>();
+    if (prIds.length > 0) {
+      const findingRows = await container.db
+        .select({
+          prId: t.reviews.prId,
+          severity: t.findings.severity,
+          cnt: sql<number>`cast(count(*) as int)`,
+        })
+        .from(t.findings)
+        .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
+        .where(
+          and(
+            inArray(t.reviews.prId, prIds),
+            eq(t.reviews.kind, 'review'),
+            sql`${t.findings.dismissedAt} is null`,
+          ),
+        )
+        .groupBy(t.reviews.prId, t.findings.severity);
+      for (const row of findingRows) {
+        if (!findingsByPr.has(row.prId)) {
+          findingsByPr.set(row.prId, { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 });
+        }
+        const counts = findingsByPr.get(row.prId)!;
+        const sev = row.severity as keyof SeverityCounts;
+        if (sev in counts) counts[sev] = row.cnt;
+      }
+    }
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
@@ -194,6 +225,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: costByPr.has(r.id) ? costByPr.get(r.id)! : null,
+        findings_counts: findingsByPr.get(r.id) ?? null,
       };
     });
   });

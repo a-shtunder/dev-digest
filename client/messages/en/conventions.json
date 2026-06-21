@@ -18,6 +18,7 @@
     "empty": {
       "title": "No conventions yet",
       "body": "Run a scan to extract coding conventions from this repository.",
+      "bodyAfterScan": "The scan finished but didn't find any enforceable conventions in the sampled files. Try re-scanning, or check that the repository is cloned.",
       "cta": "Run scan"
     },
     "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"

@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { stat } from "node:fs/promises";
 import type { Container } from "../../platform/container.js";
 import type { ConventionCandidate, Skill } from "@devdigest/shared";
 import * as t from "../../db/schema.js";
@@ -6,6 +7,7 @@ import { NotFoundError, ValidationError } from "../../platform/errors.js";
 import { ConventionsRepository } from "./repository.js";
 import { extractConventions } from "./extractor.js";
 import { SkillsService } from "../skills/service.js";
+import { resolveFeatureModel } from "../settings/feature-models.js";
 import type { ConventionRow } from "./repository.js";
 
 function toDto(row: ConventionRow): ConventionCandidate {
@@ -49,18 +51,38 @@ export class ConventionsService {
     if (!repoRow.clonePath)
       throw new ValidationError("Repository not cloned — clone it first");
 
+    // clonePath is a stored absolute path; it can go stale if the repo was
+    // moved on disk. Verify the directory actually exists so we fail loudly
+    // here instead of silently returning [] when every file read misses.
+    const cloneDirOk = await stat(repoRow.clonePath)
+      .then((s) => s.isDirectory())
+      .catch(() => false);
+    if (!cloneDirOk)
+      throw new ValidationError(
+        "Clone directory is missing — refresh the repository to re-clone it, then scan again",
+      );
+
     const samplePaths = await this.container.repoIntel.getConventionSamples(
       repoId,
       12,
     );
 
-    const llm = await this.container.llm("openai");
+    // Provider + model are selected per-workspace in Settings (feature_models),
+    // falling back to the registry default for the 'conventions' feature. Never
+    // hardcode the model here — respect the workspace's configured choice.
+    const { provider, model } = await resolveFeatureModel(
+      this.container,
+      workspaceId,
+      "conventions",
+    );
+    const llm = await this.container.llm(provider);
 
     const candidates = await extractConventions({
       clonePath: repoRow.clonePath,
       samplePaths,
       repoName: repoRow.name,
       llm,
+      model,
     });
 
     const rows = await this.repo.replaceAll(workspaceId, repoId, candidates);

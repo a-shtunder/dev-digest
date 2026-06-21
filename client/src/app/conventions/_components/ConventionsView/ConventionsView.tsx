@@ -23,6 +23,8 @@ export function ConventionsView() {
 
   const accepted = conventions.filter((c) => c.accepted);
   const total = conventions.length;
+  const extractError =
+    extract.error instanceof Error ? extract.error.message : null;
 
   const crumb = [{ label: t("page.crumbLab") }, { label: t("page.crumb") }];
 
@@ -83,6 +85,28 @@ export function ConventionsView() {
           </div>
         </div>
 
+        {/* Extraction failure — shown above content so it surfaces whether the
+            list is empty or populated, instead of silently re-rendering empty. */}
+        {extract.isError && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 16,
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: "1px solid var(--danger-border, #5b2526)",
+              background: "var(--danger-bg, rgba(220,38,38,0.08))",
+              color: "var(--danger-text, #f87171)",
+              fontSize: 13,
+            }}
+          >
+            <strong style={{ fontWeight: 600 }}>
+              {t("page.extractionFailed")}
+            </strong>
+            {extractError ? ` — ${extractError}` : null}
+          </div>
+        )}
+
         {/* List */}
         {isLoading ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -96,9 +120,14 @@ export function ConventionsView() {
           <EmptyState
             icon="ListChecks"
             title={t("page.empty.title")}
-            body={t("page.empty.body")}
+            body={
+              extract.isSuccess && !extract.isError
+                ? t("page.empty.bodyAfterScan")
+                : t("page.empty.body")
+            }
             cta={t("page.empty.cta")}
             onCta={() => repoId && extract.mutate(repoId)}
+            ctaLoading={extract.isPending}
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

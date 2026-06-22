@@ -131,6 +131,63 @@ d('Testcontainers: DB-backed routes via app.inject', () => {
     await app.close();
   });
 
+  it('GET /repos/:id/pulls rolls up per-severity findings for the latest review batch', async () => {
+    const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
+    const app = await buildApp({
+      config,
+      db: pg.handle.db,
+      overrides: { git: new MockGitClient(), github: new MockGitHubClient() },
+    });
+    const repoId = (await app.inject({ method: 'GET', url: '/repos' })).json()[0]!.id;
+    const before = (await app.inject({ method: 'GET', url: `/repos/${repoId}/pulls` })).json();
+    const pr = before[0]!;
+    type Counts = { CRITICAL: number; WARNING: number; SUGGESTION: number } | null | undefined;
+    const tally = (counts: Counts, sev: keyof NonNullable<Counts>) => counts?.[sev] ?? 0;
+    const baseCrit = tally(pr.findings_counts, 'CRITICAL');
+    const baseWarn = tally(pr.findings_counts, 'WARNING');
+    const baseSugg = tally(pr.findings_counts, 'SUGGESTION');
+
+    // Add a fresh review batch (newest → anchors the latest batch). We assert on
+    // the DELTA so the test is robust to whatever the seed already attached.
+    const db = pg.handle.db;
+    const ws = (await db.select().from(t.workspaces).limit(1))[0]!;
+    const [review] = await db
+      .insert(t.reviews)
+      .values({ workspaceId: ws.id, prId: pr.id, kind: 'review', score: 42 })
+      .returning();
+    const mk = (severity: string, i: number) => ({
+      reviewId: review!.id,
+      file: 'src/a.ts',
+      startLine: i,
+      endLine: i,
+      severity,
+      category: 'bug',
+      title: `f${i}`,
+      rationale: 'r',
+      confidence: 0.9,
+    });
+    await db
+      .insert(t.findings)
+      .values([
+        mk('CRITICAL', 1),
+        mk('CRITICAL', 2),
+        mk('WARNING', 3),
+        mk('SUGGESTION', 4),
+        mk('SUGGESTION', 5),
+        mk('SUGGESTION', 6),
+      ]);
+
+    const after = (await app.inject({ method: 'GET', url: `/repos/${repoId}/pulls` })).json();
+    const updated = after.find((p: { id: string }) => p.id === pr.id)!;
+    // Delta over baseline == the batch we just inserted (2 CRITICAL, 1 WARNING,
+    // 3 SUGGESTION); the latest review now drives the score ring too.
+    expect(tally(updated.findings_counts, 'CRITICAL') - baseCrit).toBe(2);
+    expect(tally(updated.findings_counts, 'WARNING') - baseWarn).toBe(1);
+    expect(tally(updated.findings_counts, 'SUGGESTION') - baseSugg).toBe(3);
+    expect(updated.score).toBe(42);
+    await app.close();
+  });
+
   it('POST /repos/:id/poll syncs PR list and does NOT trigger a review', async () => {
     const config = loadConfig({ ...process.env, NODE_ENV: 'test' } as NodeJS.ProcessEnv);
     const app = await buildApp({

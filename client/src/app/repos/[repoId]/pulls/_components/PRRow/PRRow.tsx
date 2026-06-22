@@ -56,7 +56,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         )}
       </div>
       <div style={s.findingsCell} onClick={(e) => e.stopPropagation()}>
-        {pr.findings_counts ? (
+        {pr.findings_counts && pr.id ? (
           <FindingsBadgeGroup prId={pr.id} counts={pr.findings_counts} />
         ) : (
           <span style={s.muted}>—</span>

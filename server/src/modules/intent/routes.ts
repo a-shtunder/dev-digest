@@ -22,7 +22,7 @@ export default async function intentRoutes(appBase: FastifyInstance) {
     { schema: { params: IdParams } },
     async (req) => {
       const { workspaceId } = await getContext(app.container, req);
-      const service = new IntentService(app.container);
+      const service = new IntentService(app.container, req.log);
       return service.getOrCompute(workspaceId, req.params.id);
     },
   );
@@ -37,7 +37,7 @@ export default async function intentRoutes(appBase: FastifyInstance) {
     },
     async (req, reply) => {
       const { workspaceId } = await getContext(app.container, req);
-      const service = new IntentService(app.container);
+      const service = new IntentService(app.container, req.log);
       const record = await service.recompute(workspaceId, req.params.id);
       reply.status(200);
       return record;

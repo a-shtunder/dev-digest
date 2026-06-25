@@ -132,7 +132,9 @@ export class ReviewRunExecutor {
       // Prefer the stored intent (avoids an LLM call when already computed).
       let intent = await this.repo.getIntent(pull.id);
       if (!intent) {
-        intent = await new IntentService(this.container).computeForRun(
+        // Pass the run's pino logger so the reference resolver + classifier
+        // emit which specs were resolved + the assembled prompt (server logs).
+        intent = await new IntentService(this.container, logger).computeForRun(
           workspaceId,
           pull,
           repo,

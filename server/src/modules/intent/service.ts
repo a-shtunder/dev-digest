@@ -28,13 +28,15 @@ export class IntentService {
   private repo: ReviewRepository;
   private logger: Logger | undefined;
 
-  constructor(private container: Container) {
+  constructor(private container: Container, logger?: Logger) {
     this.repo = new ReviewRepository(container.db);
-    // Fastify's app.log is pino-compatible. The container doesn't expose a
-    // logger directly (unlike RunLogger which is per-run). Use undefined here
-    // so the service degrades gracefully in tests (logger is optional in all
-    // downstream callers).
-    this.logger = undefined;
+    // Optional pino-compatible logger. Route paths pass Fastify's `app.log`;
+    // a review run passes its run logger. When present, the reference resolver
+    // and classifier emit HOW the prompt was assembled — which specs/plans were
+    // resolved, token savings, and the full prompt at debug level — so the
+    // computation is verifiable post-hoc instead of inferred from the output.
+    // Defaults to undefined so the service degrades gracefully in tests.
+    this.logger = logger;
   }
 
   /**
@@ -114,6 +116,24 @@ export class IntentService {
       webFetch,
       logger: this.logger,
     });
+
+    // Verification signal: surface exactly which references were found in the PR
+    // body and which were actually resolved into the classifier input. An empty
+    // `resolved` array here means NO spec/plan reached the model — the intent was
+    // derived from title + file list + hunk headers alone.
+    this.logger?.info(
+      {
+        prId,
+        parsed: {
+          total: parsedRefs.length,
+          repoFile: parsedRefs.filter((r) => r.kind === 'repo-file').length,
+          github: parsedRefs.filter((r) => r.kind === 'github').length,
+          url: parsedRefs.filter((r) => r.kind === 'url').length,
+        },
+        resolved: references.map((r) => ({ kind: r.kind, source: r.source })),
+      },
+      `intent: parsed ${parsedRefs.length} reference(s) from PR body, resolved ${references.length}`,
+    );
 
     // 8. Extract the first linked issue as a dedicated `issue` parameter for
     //    the classifier. The resolved references already contain GitHub issues,

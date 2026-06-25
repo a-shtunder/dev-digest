@@ -169,6 +169,26 @@ export async function classifyIntent(opts: ClassifyIntentOpts): Promise<Classify
   // Total bytes of reference content included (for trade-off visibility).
   const refsBytes = references.reduce((sum, ref) => sum + Buffer.byteLength(ref.content, 'utf8'), 0);
 
+  // Full assembled prompt at debug level — lets you read EXACTLY what was sent
+  // to the classifier (incl. any <untrusted source="spec:..."> blocks), so you
+  // can confirm whether a referenced plan/spec actually reached the model.
+  // Enable with LOG_LEVEL=debug. `sections` is the cheap always-on summary.
+  logger?.debug(
+    {
+      model,
+      sections: {
+        hasBody: Boolean(body?.trim()),
+        hasIssue: Boolean(issue),
+        referenceCount: references.length,
+        referenceSources: references.map((r) => r.source),
+        fileCount: diff.files.length,
+      },
+      promptChars: userMessage.length,
+      prompt: userMessage,
+    },
+    'intent: assembled classifier prompt',
+  );
+
   // Call the LLM with structured output.
   const result = await llm.completeStructured({
     model,

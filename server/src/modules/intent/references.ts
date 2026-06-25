@@ -317,6 +317,10 @@ export async function resolveReferences(
         break;
       }
 
+      logger?.info(
+        { kind: ref.kind, source, bytes: contentBytes },
+        `intent:references resolved ${ref.kind}: ${source}`,
+      );
       accumulatedBytes += contentBytes;
       resolved.push({ kind: ref.kind, source, content });
     } catch {

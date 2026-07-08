@@ -6,6 +6,7 @@
     "repoFallback": "repo",
     "subtitle": "Scan the cloned repo to surface house-rules — each backed by evidence you can turn into a Skill.",
     "scanning": "Scanning…",
+    "scanningHint": "Analysing sampled files — this can take up to a minute.",
     "rescan": "Re-scan",
     "runExtraction": "Run extraction",
     "extractionFailed": "Extraction failed",
@@ -17,10 +18,34 @@
     },
     "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
   },
+  "toolbar": {
+    "deselectAll": "Deselect all",
+    "accepted": "{accepted} of {total} accepted",
+    "createSkill": "Create skill"
+  },
   "card": {
     "confidence": "Confidence",
+    "accept": "Accept",
     "accepted": "Accepted",
-    "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "reject": "Reject",
+    "edit": "Edit rule",
+    "save": "Save",
+    "cancel": "Cancel",
+    "working": "…"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "mergedFrom": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Everything below is editable before you save.",
+    "name": "Name",
+    "description": "Description",
+    "type": "Type",
+    "enabled": "Enabled",
+    "enabledHint": "Whether this block is added to agents' prompts.",
+    "body": "Skill body",
+    "tokens": "{count} tokens",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "cancel": "Cancel",
+    "createFailed": "Could not create the skill."
   }
 }

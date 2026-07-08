@@ -176,8 +176,27 @@ export const ConventionCandidate = z.object({
   evidence_snippet: z.string(),
   confidence: z.number().min(0).max(1),
   accepted: z.boolean(),
+  /** Deep-link to the cited line on GitHub (owner/name/branch known server-side). */
+  evidence_url: z.string().nullish(),
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+/**
+ * Structured output the extraction model must return. Each candidate anchors a
+ * house rule to a concrete file+line so the server can verify the evidence
+ * against the cloned repo before persisting (hallucinated anchors are dropped).
+ */
+export const ConventionExtraction = z.object({
+  candidates: z.array(
+    z.object({
+      category: z.string(),
+      rule: z.string(),
+      evidence: z.object({ file: z.string(), line: z.number().int().positive() }),
+      confidence: z.number().min(0).max(1),
+    }),
+  ),
+});
+export type ConventionExtraction = z.infer<typeof ConventionExtraction>;
 
 // ---- Agents ----
 export const Provider = z.enum(['openai', 'anthropic', 'openrouter']);

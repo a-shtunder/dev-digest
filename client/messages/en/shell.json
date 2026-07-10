@@ -41,5 +41,36 @@
     "viewOnGitHub": "View on GitHub",
     "postedToGitHub": "Posts to GitHub immediately",
     "outdatedTitle": "{count} comment(s) on older revisions"
+  },
+  "smartDiff": {
+    "smartOrder": "Smart order",
+    "originalOrder": "Original order",
+    "header": "REVIEWER-ORDERED DIFF",
+    "statsLine": "{n} files · +{a} −{d}",
+    "findingsBadge": "{n} findings",
+    "whatThisDoes": "What this does",
+    "summaryChip": "summary",
+    "splitSuggestion": "This PR looks large ({lines} changed lines) — consider splitting it into smaller reviewable pieces.",
+    "empty": "No smart diff available yet.",
+    "loading": "Loading smart diff…",
+    "severity": {
+      "CRITICAL": "blocker",
+      "WARNING": "warning",
+      "SUGGESTION": "suggestion"
+    },
+    "role": {
+      "core": {
+        "label": "Core logic",
+        "description": "The substance of the change — review closely"
+      },
+      "wiring": {
+        "label": "Wiring",
+        "description": "Hooks the core into the app"
+      },
+      "boilerplate": {
+        "label": "Boilerplate",
+        "description": "Generated / mechanical — skim"
+      }
+    }
   }
 }

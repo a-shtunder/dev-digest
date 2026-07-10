@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "devdigest": {
+      "command": "tsx",
+      "args": ["src/server.ts"],
+      "cwd": "mcp"
+    }
+  }
+}

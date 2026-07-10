@@ -73,6 +73,17 @@ export async function reviewsForPull(
   }));
 }
 
+/** The review + findings for a single run (a run has at most one review). */
+export async function reviewByRunId(
+  db: Db,
+  runId: string,
+): Promise<{ review: ReviewRow; findings: FindingRow[] } | undefined> {
+  const [review] = await db.select().from(t.reviews).where(eq(t.reviews.runId, runId));
+  if (!review) return undefined;
+  const findings = await db.select().from(t.findings).where(eq(t.findings.reviewId, review.id));
+  return { review, findings };
+}
+
 export async function getReview(db: Db, reviewId: string): Promise<ReviewRow | undefined> {
   const [row] = await db.select().from(t.reviews).where(eq(t.reviews.id, reviewId));
   return row;

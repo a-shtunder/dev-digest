@@ -110,6 +110,12 @@ export class RepoService {
     return rows.map(toRepoDto);
   }
 
+  /** Resolve a repo by its `owner/name` full name within a workspace (read-only). */
+  async getByFullName(workspaceId: string, fullName: string): Promise<Repo | undefined> {
+    const row = await this.repo.findByFullName(workspaceId, fullName);
+    return row ? toRepoDto(row) : undefined;
+  }
+
   /** Re-fetch the clone for an existing repo (enqueues a fresh `clone` job). */
   async refresh(workspaceId: string, id: string): Promise<{ status: 'refreshing' }> {
     const repo = await this.repo.getById(workspaceId, id);

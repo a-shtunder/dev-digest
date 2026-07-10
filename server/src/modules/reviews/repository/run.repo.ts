@@ -99,6 +99,19 @@ export async function listRunsForPull(
   });
 }
 
+/** Single agent_run row by id, workspace-scoped. */
+export async function getAgentRun(
+  db: Db,
+  workspaceId: string,
+  runId: string,
+): Promise<typeof t.agentRuns.$inferSelect | undefined> {
+  const [row] = await db
+    .select()
+    .from(t.agentRuns)
+    .where(and(eq(t.agentRuns.id, runId), eq(t.agentRuns.workspaceId, workspaceId)));
+  return row;
+}
+
 /** Delete one agent run (+ its trace via FK cascade). Workspace-scoped. */
 export async function deleteAgentRun(
   db: Db,

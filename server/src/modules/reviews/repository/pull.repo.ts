@@ -26,6 +26,19 @@ export async function getRepo(
   return row;
 }
 
+/** Resolve a PR by (repoId, number) — unique via `pr_repo_number_uq`. */
+export async function getPullByRepoAndNumber(
+  db: Db,
+  repoId: string,
+  number: number,
+): Promise<PullRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(t.pullRequests)
+    .where(and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.number, number)));
+  return row;
+}
+
 export async function getPrFiles(
   db: Db,
   prId: string,

@@ -13,6 +13,12 @@ describe('classifyFile', () => {
     expect(classifyFile('server.ts')).toBe('wiring');
   });
 
+  it('type declarations, SVGs, and generated migrations are boilerplate', () => {
+    expect(classifyFile('src/types/api.d.ts')).toBe('boilerplate');
+    expect(classifyFile('client/public/logo.svg')).toBe('boilerplate');
+    expect(classifyFile('src/db/migrations/0011_new_table.sql')).toBe('boilerplate');
+  });
+
   it('CI/CD and container config are wiring, not core', () => {
     expect(classifyFile('.github/workflows/client.yml')).toBe('wiring');
     expect(classifyFile('.github/workflows/e2e-web.yml')).toBe('wiring');

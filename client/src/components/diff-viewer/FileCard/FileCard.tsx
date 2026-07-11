@@ -41,6 +41,7 @@ export function FileCard({
   summaryChipLabel,
   findingsLabel,
   severityLabels,
+  onFindingsBadgeClick,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
@@ -58,6 +59,8 @@ export function FileCard({
   findingsLabel?: string;
   /** i18n labels for inline severity chips (blocker/warning/suggestion). Required together with `marksByLine`. */
   severityLabels?: SeverityChipLabels;
+  /** Smart Diff only: called (in addition to the local expand+scroll) when the findings badge is clicked — used to navigate to the Findings tab deep-linked to this file's first finding. */
+  onFindingsBadgeClick?: () => void;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
@@ -95,6 +98,7 @@ export function FileCard({
     requestAnimationFrame(() => {
       firstFindingLineRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+    onFindingsBadgeClick?.();
   };
 
   return (

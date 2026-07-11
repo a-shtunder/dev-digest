@@ -15,6 +15,8 @@ export const BOILERPLATE_PATTERNS: RegExp[] = [
   /(^|\/)__snapshots__\//,
   /\.snap$/,
   /(^|\/)node_modules\//,
+  /\.(d\.ts|svg)$/, // generated type declarations + vector assets
+  /(^|\/)migrations\//, // generated SQL, never hand-authored
 ];
 
 export const WIRING_PATTERNS: RegExp[] = [

@@ -1,11 +1,22 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord, PrFile, SmartDiff } from "@devdigest/shared";
 import messages from "../../../messages/en/shell.json";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push, replace: vi.fn() }),
+  usePathname: () => "/repos/r1/pulls/42",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { SmartDiffViewer } from "./SmartDiffViewer";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  push.mockClear();
+});
 
 const FILES: PrFile[] = [
   {
@@ -147,6 +158,12 @@ describe("SmartDiffViewer", () => {
     expect(screen.queryByText('const secret = "hardcoded";')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("1 findings"));
     expect(screen.getByText('const secret = "hardcoded";')).toBeInTheDocument();
+  });
+
+  it("clicking the findings badge navigates to the Findings tab deep-linked to that finding", () => {
+    renderWithIntl(<SmartDiffViewer files={FILES} smartDiff={SMART_DIFF} findings={FINDINGS} />);
+    fireEvent.click(screen.getByText("1 findings"));
+    expect(push).toHaveBeenCalledWith("/repos/r1/pulls/42?tab=findings&finding=f-1");
   });
 
   it("renders an inline severity chip labelled 'blocker' for a CRITICAL finding", () => {

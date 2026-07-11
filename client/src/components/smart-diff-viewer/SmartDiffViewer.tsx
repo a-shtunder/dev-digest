@@ -7,6 +7,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon, SEV } from "@devdigest/ui";
 import type { FindingRecord, PrFile, Severity, SmartDiff, SmartDiffFile } from "@devdigest/shared";
 import { FileCard } from "@/components/diff-viewer/FileCard";
@@ -53,6 +54,20 @@ function severityRank(sev: Severity): number {
   return sev === "CRITICAL" ? 2 : sev === "WARNING" ? 1 : 0;
 }
 
+/** The finding to deep-link to when the badge is clicked: the one at the
+    lowest finding_line, joined the same way as severityMarksFor. */
+function firstFindingIdFor(smartFile: SmartDiffFile, findings: FindingRecord[]): string | null {
+  if (smartFile.finding_lines.length === 0) return null;
+  const lineSet = new Set(smartFile.finding_lines);
+  let best: FindingRecord | null = null;
+  for (const f of findings) {
+    if (f.file !== smartFile.path) continue;
+    if (!lineSet.has(f.start_line)) continue;
+    if (!best || f.start_line < best.start_line) best = f;
+  }
+  return best?.id ?? null;
+}
+
 /** One reviewer-ordered file group: dot + name + description + count, files. */
 function SmartDiffGroupSection({
   role,
@@ -63,6 +78,7 @@ function SmartDiffGroupSection({
   severityLabels,
   summaryLabel,
   summaryChipLabel,
+  onNavigateToFinding,
 }: {
   role: "core" | "wiring" | "boilerplate";
   smartFiles: SmartDiffFile[];
@@ -72,6 +88,8 @@ function SmartDiffGroupSection({
   severityLabels: SeverityChipLabels;
   summaryLabel: string;
   summaryChipLabel: string;
+  /** Navigates to the Findings tab, deep-linked to a specific finding. */
+  onNavigateToFinding: (findingId: string) => void;
 }) {
   const meta = ROLE_META[role];
   // Boilerplate is collapsed by default; core/wiring start expanded.
@@ -123,6 +141,7 @@ function SmartDiffGroupSection({
             const file = filesByPath.get(sf.path);
             if (!file) return null;
             const marksByLine = severityMarksFor(sf, findings);
+            const firstFindingId = firstFindingIdFor(sf, findings);
             return (
               <FileCard
                 key={sf.path}
@@ -134,6 +153,7 @@ function SmartDiffGroupSection({
                     ? t("smartDiff.findingsBadge", { n: sf.finding_lines.length })
                     : undefined
                 }
+                onFindingsBadgeClick={firstFindingId ? () => onNavigateToFinding(firstFindingId) : undefined}
                 summary={sf.pseudocode_summary ?? undefined}
                 summaryLabel={summaryLabel}
                 summaryChipLabel={summaryChipLabel}
@@ -157,6 +177,20 @@ export function SmartDiffViewer({
   findings: FindingRecord[];
 }) {
   const t = useTranslations("shell");
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+
+  // Findings badge → Findings tab, deep-linked to the specific finding.
+  const navigateToFinding = React.useCallback(
+    (findingId: string) => {
+      const sp = new URLSearchParams(search.toString());
+      sp.set("tab", "findings");
+      sp.set("finding", findingId);
+      router.push(`${pathname}?${sp.toString()}`);
+    },
+    [router, pathname, search],
+  );
 
   const filesByPath = React.useMemo(() => {
     const m = new Map<string, PrFile>();
@@ -231,6 +265,7 @@ export function SmartDiffViewer({
           severityLabels={severityLabels}
           summaryLabel={summaryLabel}
           summaryChipLabel={summaryChipLabel}
+          onNavigateToFinding={navigateToFinding}
         />
       ))}
     </div>

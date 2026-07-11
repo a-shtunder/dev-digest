@@ -21,6 +21,9 @@ interface FindingsTabProps {
   /** owner/repo + head sha — used to deep-link a finding's file:line to GitHub. */
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Deep-link from the Smart Diff findings badge (?finding=) — opens + scrolls
+   *  to the review run containing this finding, then focuses its FindingCard. */
+  targetFindingId?: string | null;
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
@@ -37,6 +40,7 @@ export function FindingsTab({
   cancelMutation,
   repoFullName,
   headSha,
+  targetFindingId,
   onOpenTrace,
   onDelete,
   onRunDone,
@@ -70,6 +74,16 @@ export function FindingsTab({
   const handleGoToReview = useCallback((runId: string) => {
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
+
+  // Smart Diff findings-badge deep link: locate the run holding targetFindingId
+  // and drive it through the same open+scroll mechanism as the Timeline.
+  const targetFindingRunId = React.useMemo(() => {
+    if (!targetFindingId) return null;
+    return runs.find((r) => r.findings.some((f) => f.id === targetFindingId))?.run_id ?? null;
+  }, [runs, targetFindingId]);
+  React.useEffect(() => {
+    if (targetFindingRunId) handleGoToReview(targetFindingRunId);
+  }, [targetFindingRunId, handleGoToReview]);
 
   return (
     <section>
@@ -164,6 +178,7 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            targetFindingId={targetFindingId}
           />
         ))
       )}

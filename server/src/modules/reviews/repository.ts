@@ -35,6 +35,11 @@ export class ReviewRepository {
     return pullRepo.getRepo(this.db, repoId);
   }
 
+  /** Resolve a PR by (repoId, number) — unique via `pr_repo_number_uq`. */
+  getPullByRepoAndNumber(repoId: string, number: number): Promise<PullRow | undefined> {
+    return pullRepo.getPullByRepoAndNumber(this.db, repoId, number);
+  }
+
   getPrFiles(prId: string): Promise<(typeof t.prFiles.$inferSelect)[]> {
     return pullRepo.getPrFiles(this.db, prId);
   }
@@ -64,6 +69,11 @@ export class ReviewRepository {
     return reviewRepo.reviewsForPull(this.db, prId);
   }
 
+  /** The review + findings for a single run (a run has at most one review). */
+  reviewByRunId(runId: string): Promise<{ review: ReviewRow; findings: FindingRow[] } | undefined> {
+    return reviewRepo.reviewByRunId(this.db, runId);
+  }
+
   getReview(reviewId: string): Promise<ReviewRow | undefined> {
     return reviewRepo.getReview(this.db, reviewId);
   }
@@ -90,6 +100,11 @@ export class ReviewRepository {
   /** Mark a still-running run as cancelled (no-op if it already finished). */
   cancelRunIfRunning(runId: string): Promise<boolean> {
     return runRepo.cancelRunIfRunning(this.db, runId);
+  }
+
+  /** Single agent_run row by id, workspace-scoped. */
+  getAgentRun(workspaceId: string, runId: string): Promise<typeof t.agentRuns.$inferSelect | undefined> {
+    return runRepo.getAgentRun(this.db, workspaceId, runId);
   }
 
   /** On boot: any run still 'running' is orphaned (its process died / restarted),

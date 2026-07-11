@@ -279,6 +279,7 @@ export class RepoIntelService implements RepoIntel {
           file: r.fromPath,
           symbol: callerName,
           viaSymbol: sym.name,
+          viaFile: sym.file,
           line: r.line,
           rank: 0, // ripgrep/degraded path has no persistent rank
         });
@@ -338,20 +339,49 @@ export class RepoIntelService implements RepoIntel {
       return { changedSymbols, callers: [], impactedEndpoints: [], degraded: false };
     }
 
-    // Resolved cross-file callers.
-    const callerRows = await this.repo.getResolvedCallers(repoId, changedFiles, [...nameSet]);
+    // Resolved cross-file callers. `getResolvedCallers` already resolves each
+    // row's `declFile` precisely against the WHERE clause (declFile IN
+    // changedFiles), so use it directly instead of re-deriving identity from
+    // a name-only map — two changed files that happen to declare a
+    // same-named symbol (e.g. two route files each exporting `handler`) must
+    // stay distinguishable by (declFile, toSymbol), not just toSymbol. Drop
+    // rows where the "caller" file is the same file that declares the symbol
+    // (a self-reference isn't a real caller for blast-radius purposes;
+    // mirrors the degraded/ripgrep sibling path's `r.fromPath === sym.file`
+    // guard above).
+    const resolvedRows = await this.repo.getResolvedCallers(repoId, changedFiles, [...nameSet]);
+    const callerRows = resolvedRows.filter(
+      (c): c is typeof c & { declFile: string } =>
+        c.declFile != null && c.fromPath !== c.declFile,
+    );
     const callerFiles = [...new Set(callerRows.map((c) => c.fromPath))];
 
-    // Enclosing caller symbol from the callers' persistent symbol rows.
-    const callerSymRows = await this.repo.getSymbolRows(repoId, callerFiles);
+    // Enclosing caller symbol from the callers' persistent symbol rows. A
+    // caller file that's ALSO one of the PR's changed files (two changed
+    // files calling each other) already has its rows in `declRows` — only
+    // query the ones we don't already have.
+    const changedFileSet = new Set(changedFiles);
+    const uncachedCallerFiles = callerFiles.filter((f) => !changedFileSet.has(f));
+    const callerSymRows =
+      uncachedCallerFiles.length > 0
+        ? await this.repo.getSymbolRows(repoId, uncachedCallerFiles)
+        : [];
     const symsByFile = new Map<string, FullSymbolRow[]>();
-    for (const s of callerSymRows) {
+    for (const s of [...declRows, ...callerSymRows]) {
       const arr = symsByFile.get(s.path);
       if (arr) arr.push(s);
       else symsByFile.set(s.path, [s]);
     }
 
-    const callers: BlastCallerRow[] = [];
+    // Bucket callers PER changed symbol, keyed by (declFile, toSymbol) — not
+    // toSymbol alone — so that a high-volume symbol can't consume the whole
+    // `MAX_CALLERS_PER_SYMBOL` budget and starve a low-volume one, even when
+    // two changed files declare a same-named symbol. Dedup is folded into
+    // this same pass (same `${fromPath}|${enclosing}|${toSymbol}` key as
+    // before — a caller can legitimately reach two same-named symbols from
+    // one line only in the same-name-collision case, which is already rare
+    // enough that collapsing it here is an acceptable simplification).
+    const bucketsBySymbol = new Map<string, BlastCallerRow[]>();
     const seenCaller = new Set<string>();
     for (const c of callerRows) {
       const enclosing =
@@ -361,19 +391,59 @@ export class RepoIntelService implements RepoIntel {
       const key = `${c.fromPath}|${enclosing}|${c.toSymbol}`;
       if (seenCaller.has(key)) continue;
       seenCaller.add(key);
-      callers.push({
+      const row: BlastCallerRow = {
         file: c.fromPath,
         symbol: enclosing,
         viaSymbol: c.toSymbol,
+        viaFile: c.declFile,
         line: c.line,
         rank: c.rank,
-      });
+      };
+      const bucketKey = `${c.declFile}|${c.toSymbol}`;
+      const bucket = bucketsBySymbol.get(bucketKey);
+      if (bucket) bucket.push(row);
+      else bucketsBySymbol.set(bucketKey, [row]);
     }
-    callers.sort((a, b) => b.rank - a.rank);
 
-    // Precomputed facts per caller file (endpoints + crons), so consumers can
-    // attribute them to the changed symbol whose callers live in that file.
-    const facts = await this.repo.getFileFacts(repoId, callerFiles);
+    // Cap EACH symbol's bucket independently (sorted by rank desc first),
+    // THEN flatten — replaces the old single `callers.slice(0,
+    // MAX_CALLERS_PER_SYMBOL)` over the unbucketed, rank-sorted array, which
+    // let one symbol's callers consume the entire budget.
+    const callers: BlastCallerRow[] = [];
+    for (const bucket of bucketsBySymbol.values()) {
+      bucket.sort((a, b) => b.rank - a.rank);
+      callers.push(...bucket.slice(0, MAX_CALLERS_PER_SYMBOL));
+    }
+    callers.sort((a, b) => b.rank - a.rank); // stable display ordering
+
+    // 2-hop endpoint reachability: depth1Files are the (now-correct) direct
+    // caller files; walk one more hop backwards over the repo's import edges
+    // ("who imports this file") to find depth2Files, so an endpoint route
+    // that only imports a caller file (rather than calling the changed
+    // symbol directly) still shows up. Each hop queries `getEdges` scoped to
+    // the current frontier only (not the whole repo's edge table), so this
+    // stays cheap on large repos regardless of `BFS_DEPTH`.
+    const depth1Files = callerFiles;
+    const visited = new Set([...changedFiles, ...depth1Files]);
+    const reachableFiles = [...depth1Files];
+    let frontier = depth1Files;
+    for (let depth = 1; depth < BFS_DEPTH && frontier.length > 0; depth += 1) {
+      const edges = await this.repo.getEdges(repoId, { toFiles: frontier });
+      const next: string[] = [];
+      for (const e of edges) {
+        if (visited.has(e.fromFile)) continue;
+        visited.add(e.fromFile);
+        next.push(e.fromFile);
+      }
+      if (next.length === 0) break;
+      reachableFiles.push(...next);
+      frontier = next;
+    }
+
+    // Precomputed facts per caller file (endpoints + crons), across both
+    // hops, so consumers can attribute them to the changed symbol whose
+    // callers live in that file.
+    const facts = await this.repo.getFileFacts(repoId, reachableFiles);
     const endpoints = new Set<string>();
     const factsByFile: Record<string, { endpoints: string[]; crons: string[] }> = {};
     for (const f of facts) {
@@ -383,7 +453,7 @@ export class RepoIntelService implements RepoIntel {
 
     return {
       changedSymbols,
-      callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
+      callers,
       impactedEndpoints: [...endpoints],
       factsByFile,
       degraded: false,

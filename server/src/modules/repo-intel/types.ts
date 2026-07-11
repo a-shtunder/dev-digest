@@ -65,6 +65,9 @@ export interface BlastCallerRow {
   symbol: string;
   /** Which changed symbol this caller reaches. */
   viaSymbol: string;
+  /** The file that declares `viaSymbol` — disambiguates two changed files
+   *  that happen to declare a same-named symbol. */
+  viaFile: string;
   /** 1-based line of the reference (representative; for the BlastRadius view). */
   line: number;
   /** file_rank.rank of the caller file (0 in the degraded/ripgrep path). */

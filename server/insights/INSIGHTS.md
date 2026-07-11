@@ -21,6 +21,8 @@ See also: `insights/gotchas.md` for known quirks at project start.
 
 2026-06-17 — `selectDistinctOn([agentRuns.prId])` for cost silently returns null when the most recent run errored (`cost_usd = null`). DISTINCT ON picks the newest row regardless of whether the value is null — so a trailing error run zeros out the entire COST column. Fix: use `sql\`sum(${t.agentRuns.costUsd})\`` with `.groupBy(t.agentRuns.prId)` — SQL SUM skips nulls, so error runs don't affect the total. ref: server/src/modules/pulls/routes.ts:122
 
+2026-07-11 — `tryPersistentBlast` (repo-intel/service.ts) calls `this.repo.getSymbolRows(repoId, paths)` TWICE with different `paths` arrays in the same method (once for `changedFiles` to build `changedSymbols`, once for `callerFiles` to resolve each caller's enclosing symbol name). A hermetic test double for this method must branch on the `paths` argument (e.g. filter a fixed row list by `paths.includes(r.path)`) rather than returning a single fixed array, or the second call silently returns the wrong rows. ref: server/src/modules/repo-intel/service.ts:328
+
 ## Codebase Patterns
 
 2026-06-22 — The minimal `Logger` type (`{ info, warn, error, debug }`) for new server modules is NOT exported from `@devdigest/shared` — it lives in `server/src/modules/reviews/run-executor.ts` as `export type Logger`. Import it with `import type { Logger } from '../reviews/run-executor.js'`. ref: server/src/modules/reviews/run-executor.ts:31
@@ -88,6 +90,8 @@ See also: `insights/gotchas.md` for known quirks at project start.
 2026-06-17 — COST column showed '–' for PRs with a trailing errored run → replaced `selectDistinctOn` with `sql\`sum\`` + `groupBy`. Root cause: DISTINCT ON returns the newest row even when its cost is null. Files: server/src/modules/pulls/routes.ts.
 
 2026-06-17 — Run Cost Badge: added `last_run_cost_usd` to PR list response. Used `selectDistinctOn` subquery to get most recent agent run cost per PR in a single query (no N+1). No migration needed — `agent_runs.cost_usd` column already existed in the schema. Files: server/src/modules/pulls/routes.ts, server/src/vendor/shared/contracts/platform.ts.
+
+2026-07-11 — Task #2 (blast-radius plan): created `server/src/modules/blast/` (`service.ts` + `routes.ts`) and registered it in `modules/index.ts`. `BlastService` has no `repository.ts` — it only needs `container.reviewRepo.getPull`/`getPrFiles` (already public Container getters) then delegates 100% to `container.repoIntel.getBlastRadius`, which never throws, so the route returns its result unchanged with zero branching. Confirmed `PullRow.repoId` (server/src/db/schema/pulls.ts:11) and `prFiles.path` (schema/pulls.ts:36) match the plan's pseudocode exactly — no adjustment needed. Zero new typecheck errors; 120/120 hermetic unit tests pass (4 new in `blast/service.test.ts`). Files: server/src/modules/blast/service.ts, server/src/modules/blast/routes.ts, server/src/modules/blast/service.test.ts, server/src/modules/index.ts.
 
 ## Open Questions
 

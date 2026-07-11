@@ -44,19 +44,50 @@ field, not repeated per tool.
 
 ## Registering with an MCP client
 
-Add to `.mcp.json` at the repo root (already present):
+Deliberately **not** committed as a project-scope `.mcp.json` at the repo
+root — that would auto-load this server (and prompt for approval) in every
+Claude Code session for every person who checks out the repo, and would run
+even when nobody needs the tools. Instead, raise it explicitly, only when
+you want it:
 
-```json
-{
-  "mcpServers": {
-    "devdigest": {
-      "command": "tsx",
-      "args": ["src/server.ts"],
-      "cwd": "mcp"
-    }
-  }
-}
+**Option A — register with Claude Code, local scope** (the default scope —
+persists across your own sessions in this repo, stored in `~/.claude.json`,
+never shared via git, nobody else gets it):
+
+```sh
+claude mcp add devdigest -- sh -c "cd mcp && tsx src/server.ts"
 ```
+
+Run from the repo root (`local` is the default scope, no flag needed). The
+`claude mcp add` CLI form has no `--cwd` flag, and **`tsx` resolves
+`tsconfig.json` — and therefore this package's path aliases into
+`server/src` — relative to the process's working directory, not the entry
+file's location** (verified empirically: `tsx mcp/src/server.ts` run from
+the repo root fails with `ERR_MODULE_NOT_FOUND` on `@server/*`; the `cd mcp
+&&` wrapper above is required, not optional). Remove the registration with:
+
+```sh
+claude mcp remove devdigest
+```
+
+**Option B — one-off, for a single Claude Code invocation only** (the JSON
+form DOES support a `cwd` field per server, unlike the `claude mcp add` CLI):
+
+```sh
+claude --mcp-config '{"mcpServers":{"devdigest":{"command":"tsx","args":["src/server.ts"],"cwd":"mcp"}}}'
+```
+
+**Option C — no Claude Code at all, raw process** (for manual testing, the
+MCP Inspector, or a custom client — this one you always run with `mcp/` as
+cwd already, so it just works):
+
+```sh
+cd mcp && pnpm start
+```
+
+If you do want project-scope sharing (everyone who opens the repo gets it
+offered), that's a deliberate opt-in — create `.mcp.json` at the repo root
+yourself with the same `cwd`-bearing JSON as Option B's `--mcp-config` value.
 
 ## Typecheck
 

@@ -115,6 +115,14 @@ export interface ReviewOutcome {
   costUsd: number | null;
   /** Joined raw model outputs (for the run trace). */
   raw: string;
+  /**
+   * Per-file neutral "what this does" summaries, extracted from the raw
+   * per-chunk `partials[]` BEFORE `reduceReviews` (which deliberately drops
+   * `walkthrough`). Map-reduce only — one entry per file whose partial had a
+   * non-empty `walkthrough`; single-pass has no per-file attribution ⇒ `[]`.
+   * Zero new LLM calls — pure additive extraction of an already-produced field.
+   */
+  fileSummaries: { path: string; summary: string }[];
 }
 
 function selectMode(strategy: ReviewStrategy, diff: UnifiedDiff, threshold: number): ReviewMode {
@@ -193,6 +201,17 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     emit('result', `${chunk.label}: ${res.data.findings.length} candidate finding(s)`);
   }
 
+  // Extracted from the RAW partials BEFORE reduceReviews (which drops
+  // `walkthrough`). chunks and partials are index-aligned — one partial per
+  // chunk, pushed in order in the loop above.
+  const fileSummaries =
+    mode === 'map-reduce'
+      ? chunks
+          .map((c, i) => ({ path: c.label, summary: partials[i]?.walkthrough }))
+          .filter((x): x is { path: string; summary: string } =>
+            typeof x.summary === 'string' && x.summary.trim().length > 0)
+      : [];
+
   const merged = reduceReviews(partials);
   emit(
     'result',
@@ -221,5 +240,6 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     tokensOut,
     costUsd,
     raw: raws.join('\n---\n'),
+    fileSummaries,
   };
 }

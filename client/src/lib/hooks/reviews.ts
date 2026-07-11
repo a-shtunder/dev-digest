@@ -127,6 +127,9 @@ export function useRunReview() {
       }),
     onSuccess: (_d, { prId }) => {
       qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      // Smart Diff badges ("N findings") derive from the latest review's
+      // findings — refresh them too.
+      qc.invalidateQueries({ queryKey: ["smart-diff", prId] });
     },
   });
 }

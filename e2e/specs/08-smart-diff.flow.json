@@ -1,0 +1,21 @@
+{
+  "name": "PR detail Smart Diff groups files core-above-boilerplate with findings badges",
+  "description": "From PR #483 (the seeded mega-PR: 8 files / 520 changed lines, mixing core/wiring/boilerplate), open the Files changed tab. Smart order is the default view: confirms the Core logic group and a core file render, the Boilerplate group starts collapsed (its file is not on the page until its header is clicked), and the seeded review's findings surface as a 'N findings' badge + the split_suggestion banner (8 files / 520 lines clears both too_big thresholds). Read-only seeded data (no model call — Smart Diff is a deterministic recomposition of already-persisted files + findings, zero new LLM calls). Assumes a freshly-seeded DB (see e2e/README.md).",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["find", "text", "Refactor payment webhook pipeline", "click"], "label": "open the mega-PR row" },
+    { "cmd": ["wait", "--url", "/pulls/483"], "label": "navigate to the PR detail route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Files changed"], "label": "switch to the Files changed tab" },
+    { "cmd": ["wait", "--url", "tab=diff"], "label": "diff tab is active in the URL" },
+    { "cmd": ["wait", "--text", "REVIEWER-ORDERED DIFF"], "label": "Smart order is the default view" },
+    { "cmd": ["wait", "--text", "Core logic"], "label": "the core group renders" },
+    { "cmd": ["wait", "--text", "src/payments/webhook-processor.ts"], "label": "a core file is listed" },
+    { "cmd": ["wait", "--text", "2 findings"], "label": "the seeded review's findings surface as a badge on the core file" },
+    { "cmd": ["wait", "--text", "520 changed lines"], "label": "split_suggestion banner shows for the oversized mega-PR" },
+    { "cmd": ["wait", "--text", "Boilerplate"], "label": "the boilerplate group header renders (collapsed — its file is not yet visible)" },
+    { "cmd": ["find", "text", "Boilerplate", "click"], "label": "expand the boilerplate group" },
+    { "cmd": ["wait", "--text", "pnpm-lock.yaml"], "label": "the lock file appears only after expanding boilerplate" }
+  ]
+}

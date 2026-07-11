@@ -75,6 +75,10 @@ export const Review = z.object({
       'Overall PR quality from 0 to 100, where HIGHER is better. 90–100 = no or only trivial issues (approve); 60–89 = minor suggestions; 30–59 = warnings worth addressing; 0–29 = critical problems. Must be consistent with `findings`: if there are no findings, the score is 90 or above.',
     ),
   findings: z.array(Finding),
+  walkthrough: z
+    .string()
+    .nullish()
+    .describe('Neutral 1–2 sentence description of WHAT this change does — behavior only, no verdict, no issues.'),
 });
 export type Review = z.infer<typeof Review>;
 

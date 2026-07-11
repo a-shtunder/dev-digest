@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { LLMProvider, StructuredResult } from '@devdigest/shared';
+import type { LLMProvider, Review, StructuredResult } from '@devdigest/shared';
 import { MockLLMProvider, MockGitClient } from '../../server/src/adapters/mocks.js';
 import { reviewPullRequest } from '../src/index.js';
 
@@ -134,5 +134,123 @@ describe('reviewPullRequest (engine)', () => {
     await reviewPullRequest({ systemPrompt: 's', model: 'm', diff, llm: recorder, sessionId: 'sess-abc' });
     expect(seen.length).toBeGreaterThan(0);
     expect(seen.every((s) => s === 'sess-abc')).toBe(true);
+  });
+
+  describe('fileSummaries (A2/A5 — extracted from partials[] before reduce)', () => {
+    // Two-file diff, large enough (>400 lines total via padded hunk context isn't
+    // needed — we force map-reduce explicitly via strategy) so map-reduce runs
+    // one LLM call per file: src/config.ts and src/util.ts.
+    const multiFileDiff =
+      'diff --git a/src/config.ts b/src/config.ts\n--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,3 +10,4 @@\n   port: 3000,\n+  stripeKey: "sk_live_xxx",\n   redisUrl: x,\n' +
+      'diff --git a/src/util.ts b/src/util.ts\n--- a/src/util.ts\n+++ b/src/util.ts\n@@ -1,2 +1,3 @@\n export function add(a, b) {\n+  return a + b;\n }\n';
+
+    /** Per-file walkthroughs, keyed by file path — used to drive a per-call stub LLM. */
+    function makePerFileLLM(walkthroughsByFile: Record<string, string | undefined>): LLMProvider {
+      return {
+        id: 'openai',
+        async completeStructured<T>(req): Promise<StructuredResult<T>> {
+          // The diff chunk for a map-reduce call is scoped to a single file, so
+          // the file path always appears in the assembled user message.
+          const userText = req.messages.map((m) => m.content).join('\n');
+          const path = Object.keys(walkthroughsByFile).find((p) => userText.includes(p));
+          const walkthrough = path ? walkthroughsByFile[path] : undefined;
+          const data: Review = {
+            verdict: 'approve',
+            summary: 'looks fine',
+            score: 95,
+            findings: [],
+            ...(walkthrough !== undefined ? { walkthrough } : {}),
+          };
+          return {
+            data: data as unknown as T,
+            model: req.model,
+            tokensIn: 10,
+            tokensOut: 5,
+            costUsd: 0,
+            raw: JSON.stringify(data),
+            attempts: 1,
+          };
+        },
+        async listModels() {
+          return [];
+        },
+        async complete() {
+          throw new Error('not used');
+        },
+        async embed() {
+          return [];
+        },
+      };
+    }
+
+    it('map-reduce: one fileSummaries entry per file, path === file path', async () => {
+      const llm = makePerFileLLM({
+        'src/config.ts': 'Adds a hardcoded Stripe key to the config object.',
+        'src/util.ts': 'Adds an add() helper function.',
+      });
+      const diff = await new MockGitClient({ diff: multiFileDiff }).diff();
+
+      const outcome = await reviewPullRequest({
+        systemPrompt: 'reviewer',
+        model: 'gpt-4.1',
+        diff,
+        llm,
+        strategy: 'map-reduce',
+      });
+
+      expect(outcome.mode).toBe('map-reduce');
+      expect(outcome.fileSummaries).toHaveLength(2);
+      expect(outcome.fileSummaries).toEqual(
+        expect.arrayContaining([
+          { path: 'src/config.ts', summary: 'Adds a hardcoded Stripe key to the config object.' },
+          { path: 'src/util.ts', summary: 'Adds an add() helper function.' },
+        ]),
+      );
+    });
+
+    it('single-pass: fileSummaries is empty (no per-file attribution)', async () => {
+      const llm = new MockLLMProvider('openai', {
+        structured: {
+          verdict: 'approve',
+          summary: 'ok',
+          score: 90,
+          findings: [],
+          walkthrough: 'Should be ignored — single-pass has no per-file attribution.',
+        },
+      });
+      const diff = await new MockGitClient().diff();
+
+      const outcome = await reviewPullRequest({
+        systemPrompt: 'reviewer',
+        model: 'gpt-4.1',
+        diff,
+        llm,
+        strategy: 'single-pass',
+      });
+
+      expect(outcome.mode).toBe('single-pass');
+      expect(outcome.fileSummaries).toEqual([]);
+    });
+
+    it('map-reduce: a partial with an absent/empty walkthrough is skipped', async () => {
+      const llm = makePerFileLLM({
+        'src/config.ts': 'Adds a hardcoded Stripe key to the config object.',
+        'src/util.ts': '', // empty → must be skipped
+      });
+      const diff = await new MockGitClient({ diff: multiFileDiff }).diff();
+
+      const outcome = await reviewPullRequest({
+        systemPrompt: 'reviewer',
+        model: 'gpt-4.1',
+        diff,
+        llm,
+        strategy: 'map-reduce',
+      });
+
+      expect(outcome.mode).toBe('map-reduce');
+      expect(outcome.fileSummaries).toEqual([
+        { path: 'src/config.ts', summary: 'Adds a hardcoded Stripe key to the config object.' },
+      ]);
+    });
   });
 });

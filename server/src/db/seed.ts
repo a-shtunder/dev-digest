@@ -9,7 +9,9 @@ import { eq, and } from "drizzle-orm";
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the two built-in agents (General + Security).
+ * with a few findings, PR #483 (a larger, multi-file PR exercising Smart
+ * Diff's core/wiring/boilerplate grouping + split_suggestion), and the two
+ * built-in agents (General + Security).
  *
  * Course lessons populate the other tables (skills, conventions, memory, eval,
  * …) once their features are built — they start empty here.
@@ -183,6 +185,219 @@ export async function seed(
         rationale: "Loop issues one query per user → N+1.",
         suggestion: "Use a single IN query and group in memory.",
         confidence: 0.86,
+      },
+    ]);
+  }
+
+  // ---- PR #483 (mega-PR: exercises Smart Diff core/wiring/boilerplate grouping) ----
+  let [megaPr] = await db
+    .select()
+    .from(t.pullRequests)
+    .where(
+      and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.number, 483)),
+    );
+  if (!megaPr) {
+    [megaPr] = await db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId,
+        number: 483,
+        title: "Refactor payment webhook pipeline",
+        author: "diego.reyes",
+        branch: "refactor/webhook-pipeline",
+        base: "main",
+        headSha: "f7e6d5c4b3a2",
+        additions: 497,
+        deletions: 23,
+        filesCount: 8,
+        status: "needs_review",
+        body: "Splits the monolithic webhook handler into a processor, ledger, retry queue, and idempotency store.",
+      })
+      .returning();
+
+    // pr_files: mix of core (business logic), wiring (config/entrypoint), and
+    // boilerplate (lockfile/snapshot) — large enough (8 files, 520 changed
+    // lines) to also exercise the Smart Diff split_suggestion. `additions` /
+    // `deletions` are PR-level stats (as with #482, they need not equal the
+    // literal line count of the representative `patch` text below); `patch`
+    // is real enough to render in the diff viewer and demo the feature.
+    // webhook-processor.ts's two hunks are deliberately positioned so the
+    // added lines land on newNo=5 and newNo=42 — the exact `start_line`s of
+    // the two seeded findings below — so the inline severity chips actually
+    // highlight the right rows.
+    const webhookProcessorPatch = [
+      "@@ -3,2 +3,6 @@",
+      " import crypto from 'crypto';",
+      " ",
+      "+const WEBHOOK_SECRET = \"whsec_1a2b3c4d5e6f7g8h9i0j\";",
+      "+",
+      "+function verifySignature(payload: string, sig: string): boolean {",
+      "+  const expected = crypto.createHmac('sha256', WEBHOOK_SECRET).update(payload).digest('hex');",
+      "+  return expected === sig;",
+      "+}",
+      "@@ -38,3 +40,10 @@",
+      " async function processWebhookRetry(event: WebhookEvent) {",
+      " ",
+      "+  // TODO: check idempotency key before processing",
+      "+  const payload = event.payload;",
+      "+  const account = await db.accounts.find(payload.accountId);",
+      "+  await ledger.record(account, payload.amount);",
+      "+  await notifyDownstream(account, payload);",
+      "+}",
+      " ",
+    ].join("\n");
+
+    const ledgerPatch = [
+      "@@ -1,4 +1,8 @@",
+      " export class Ledger {",
+      "-  record(account: Account, amount: number) {",
+      "-    this.entries.push({ account, amount });",
+      "-  }",
+      "+  record(account: Account, amount: number, source: 'webhook' | 'manual' = 'webhook') {",
+      "+    this.entries.push({ account, amount, source, recordedAt: new Date() });",
+      "+    this.balances.set(account.id, (this.balances.get(account.id) ?? 0) + amount);",
+      "+  }",
+      " }",
+    ].join("\n");
+
+    const retryQueuePatch = [
+      "@@ -1,1 +1,12 @@",
+      "+export class RetryQueue {",
+      "+  private pending: WebhookEvent[] = [];",
+      "+",
+      "+  enqueue(event: WebhookEvent) {",
+      "+    this.pending.push(event);",
+      "+  }",
+      "+",
+      "+  async drain(handler: (e: WebhookEvent) => Promise<void>) {",
+      "+    while (this.pending.length > 0) {",
+      "+      await handler(this.pending.shift()!);",
+      "+    }",
+      "+  }",
+      "+}",
+    ].join("\n");
+
+    const idempotencyPatch = [
+      "@@ -1,1 +1,10 @@",
+      "+const seen = new Set<string>();",
+      "+",
+      "+export function isDuplicate(idempotencyKey: string): boolean {",
+      "+  if (seen.has(idempotencyKey)) return true;",
+      "+  seen.add(idempotencyKey);",
+      "+  return false;",
+      "+}",
+    ].join("\n");
+
+    const webhookConfigPatch = [
+      "@@ -1,4 +1,6 @@",
+      " export const webhookConfig = {",
+      "-  retryLimit: 3,",
+      "+  retryLimit: 5,",
+      "+  retryBackoffMs: 500,",
+      "+  idempotencyTtlSec: 3600,",
+      " };",
+    ].join("\n");
+
+    const indexTsPatch = [
+      "@@ -1,3 +1,4 @@",
+      " import { startServer } from './server';",
+      "+import { RetryQueue } from './payments/retry-queue';",
+      " ",
+      " startServer();",
+    ].join("\n");
+
+    const lockfilePatch = [
+      "@@ -140,2 +140,3 @@",
+      "   \"dependencies\": {",
+      "+    \"p-retry\": \"^6.2.0\",",
+      "     \"fastify\": \"^5.0.0\"",
+    ].join("\n");
+
+    const snapshotPatch = [
+      "@@ -1,3 +1,5 @@",
+      " exports[`webhook processor > handles retry 1`] = `",
+      "+RetryQueue { pending: [] }",
+      "+`;",
+    ].join("\n");
+
+    await db.insert(t.prFiles).values([
+      {
+        prId: megaPr!.id,
+        path: "src/payments/webhook-processor.ts",
+        additions: 140,
+        deletions: 10,
+        patch: webhookProcessorPatch,
+      },
+      { prId: megaPr!.id, path: "src/payments/ledger.ts", additions: 100, deletions: 10, patch: ledgerPatch },
+      { prId: megaPr!.id, path: "src/payments/retry-queue.ts", additions: 60, deletions: 0, patch: retryQueuePatch },
+      { prId: megaPr!.id, path: "src/payments/idempotency.ts", additions: 50, deletions: 0, patch: idempotencyPatch },
+      {
+        prId: megaPr!.id,
+        path: "src/payments/webhook.config.ts",
+        additions: 15,
+        deletions: 2,
+        patch: webhookConfigPatch,
+      },
+      { prId: megaPr!.id, path: "src/index.ts", additions: 8, deletions: 1, patch: indexTsPatch },
+      { prId: megaPr!.id, path: "pnpm-lock.yaml", additions: 84, deletions: 0, patch: lockfilePatch },
+      {
+        prId: megaPr!.id,
+        path: "__snapshots__/webhook.test.ts.snap",
+        additions: 40,
+        deletions: 0,
+        patch: snapshotPatch,
+      },
+    ]);
+
+    await db.insert(t.prCommits).values({
+      prId: megaPr!.id,
+      sha: "f7e6d5c4b3a2",
+      message: "Split webhook handler into processor/ledger/retry-queue",
+      author: "diego.reyes",
+    });
+
+    // a sample review + findings so the mega-PR shows Smart Diff badges
+    // ("N findings") before the first live run.
+    const [megaReview] = await db
+      .insert(t.reviews)
+      .values({
+        workspaceId,
+        prId: megaPr!.id,
+        kind: "review",
+        verdict: "request_changes",
+        summary:
+          "Clean split into processor/ledger/retry-queue, but the signing secret is hardcoded and retries can double-process a payment.",
+        score: 58,
+        model: "seed",
+      })
+      .returning();
+
+    await db.insert(t.findings).values([
+      {
+        reviewId: megaReview!.id,
+        file: "src/payments/webhook-processor.ts",
+        startLine: 5,
+        endLine: 5,
+        severity: "CRITICAL",
+        category: "security",
+        title: "Webhook signing secret is hardcoded",
+        rationale: "Line 5 contains a literal webhook signing secret checked into source.",
+        suggestion: "Move to env var / secrets manager.",
+        confidence: 0.95,
+      },
+      {
+        reviewId: megaReview!.id,
+        file: "src/payments/webhook-processor.ts",
+        startLine: 42,
+        endLine: 48,
+        severity: "WARNING",
+        category: "bug",
+        title: "Retry handler does not check idempotency key",
+        rationale:
+          "Line 42 dispatches a retried webhook without checking a prior idempotency key, risking duplicate payment processing.",
+        suggestion: "Check the idempotency store before processing.",
+        confidence: 0.82,
       },
     ]);
   }

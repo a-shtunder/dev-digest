@@ -17,11 +17,15 @@ export function FindingsPanel({
   prId,
   repoFullName,
   headSha,
+  targetFindingId,
 }: {
   findings: FindingRecord[];
   prId: string;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Smart Diff deep link: when set and present in `findings`, focuses it and
+   *  scrolls its FindingCard into view. */
+  targetFindingId?: string | null;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -63,6 +67,19 @@ export function FindingsPanel({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [shown, focusIdx, action, prId]);
+
+  // Smart Diff deep link: focus + scroll to the target finding once it's visible.
+  React.useEffect(() => {
+    if (!targetFindingId) return;
+    const idx = shown.findIndex((f) => f.id === targetFindingId);
+    if (idx === -1) return;
+    setFocusIdx(idx);
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-finding-id="${CSS.escape(targetFindingId)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [targetFindingId, shown]);
 
   return (
     <div>
@@ -106,7 +123,7 @@ export function FindingsPanel({
               key={f.id}
               f={f}
               focused={i === focusIdx}
-              defaultExpanded={i === 0}
+              defaultExpanded={i === 0 || f.id === targetFindingId}
               pending={action.isPending}
               repoFullName={repoFullName}
               headSha={headSha}

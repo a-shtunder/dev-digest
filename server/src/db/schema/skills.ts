@@ -27,6 +27,10 @@ export const skills = pgTable("skills", {
   enabled: boolean("enabled").notNull().default(true),
   version: integer("version").notNull().default(1),
   evidenceFiles: jsonb("evidence_files").$type<string[]>(),
+  // Ordered repo-relative paths of attached project-context docs — distinct
+  // from `evidenceFiles`. Paths only, never text; mutable config that does
+  // NOT bump `version` (see skills/repository.ts setAttachedDocs).
+  attachedDocPaths: jsonb("attached_doc_paths").$type<string[]>().notNull().default([]),
   threatLevel: text("threat_level", {
     enum: ["unknown", "safe", "suspicious", "dangerous"],
   })

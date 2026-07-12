@@ -145,6 +145,10 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  // Project Context: ordered paths of discovered repo documents (specs/docs/
+  // insights) injected into this skill's prompt. Default [] keeps existing
+  // serialized rows valid.
+  attached_doc_paths: z.array(z.string()).default([]),
   threat_level: SkillThreatLevel.optional(),
 });
 export type Skill = z.infer<typeof Skill>;
@@ -201,6 +205,10 @@ export const Agent = z.object({
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
   skill_count: z.number().int().optional(),
+  // Project Context: ordered paths of discovered repo documents (specs/docs/
+  // insights) injected into this agent's prompt. Default [] keeps existing
+  // serialized rows valid.
+  attached_doc_paths: z.array(z.string()).default([]),
 });
 export type Agent = z.infer<typeof Agent>;
 

@@ -104,6 +104,20 @@ export class AgentsService {
     return row ? toAgentDto(row) : undefined;
   }
 
+  /**
+   * Set the agent's attached doc paths (ordered — order IS attach order, no
+   * sort/dedupe). Does not bump `version` (docs are not part of agent config
+   * versioning).
+   */
+  async setAttachedDocs(
+    workspaceId: string,
+    id: string,
+    paths: string[],
+  ): Promise<Agent | undefined> {
+    const row = await this.repo.setAttachedDocs(workspaceId, id, paths);
+    return row ? toAgentDto(row) : undefined;
+  }
+
   /** Linked skills for an agent as AgentSkillLink[] (ordered). */
   async skillLinks(agentId: string): Promise<AgentSkillLink[]> {
     const links = await this.repo.linkedSkills(agentId);

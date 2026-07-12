@@ -363,4 +363,23 @@ export class SkillsRepository {
       .set({ threatLevel })
       .where(eq(t.skills.id, id));
   }
+
+  /**
+   * Persist the ordered `attached_doc_paths` for a skill. Deliberately bypasses
+   * `update()` — touches ONLY attachedDocPaths, never `version`, `threatLevel`,
+   * or `body`, so attaching/detaching docs never bumps version, snapshots a
+   * skill_versions row, or triggers a threat re-scan.
+   */
+  async setAttachedDocs(
+    workspaceId: string,
+    id: string,
+    paths: string[],
+  ): Promise<SkillRow | undefined> {
+    const [row] = await this.db
+      .update(t.skills)
+      .set({ attachedDocPaths: paths })
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
+      .returning();
+    return row;
+  }
 }

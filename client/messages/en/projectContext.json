@@ -1,0 +1,84 @@
+{
+  "agentTab": {
+    "title": "Project Context",
+    "attachedCount": "{attached} of {total} attached",
+    "searchPlaceholder": "Filter documents…",
+    "orderHint": "Order matters — determines injection order into the prompt.",
+    "untrustedNote": "Injected as an untrusted block (`## Project context`) into every run.",
+    "tokenEstimate": "≈ {tokens} tokens",
+    "noMatch": "No documents match.",
+    "notAvailable": "Project context isn't available yet — the repo clone hasn't been created.",
+    "noRepo": "Select a repo to manage its project context.",
+    "loadError": "Could not load project context.",
+    "preview": "Preview",
+    "close": "Close",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "attach": "Attach",
+    "detach": "Detach",
+    "usedByAgents": "Used by {count, plural, one {# agent} other {# agents}}",
+    "bucket": {
+      "specs": "Specs",
+      "docs": "Docs",
+      "insights": "Insights"
+    }
+  },
+  "skillContext": {
+    "title": "Context",
+    "attachedCount": "{count, plural, one {# attached} other {# attached}}",
+    "inheritNote": "Any agent using this skill inherits these documents.",
+    "searchPlaceholder": "Filter documents…",
+    "notAvailable": "Project context isn't available yet — the repo clone hasn't been created.",
+    "loadError": "Could not load project context.",
+    "empty": "No documents match.",
+    "preview": "Preview",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "bucket": {
+      "specs": "Specs",
+      "docs": "Docs",
+      "insights": "Insights"
+    },
+    "serializesAs": {
+      "heading": "Serializes as",
+      "contribution": "## {name} contribution",
+      "empty": "No documents attached."
+    }
+  },
+  "page": {
+    "crumbLabel": "Repository",
+    "crumb": "Project Context",
+    "heading": "Project Context",
+    "loadError": "Couldn't load project context",
+    "footer": "{count, plural, one {# document} other {# documents}} · ≈ {tokens} tokens total · refreshed {relative}"
+  },
+  "notAvailablePage": {
+    "title": "Clone not available",
+    "body": "This repo hasn't been cloned locally yet, so its specs, docs, and insights can't be discovered. Try again once the clone is ready."
+  },
+  "emptyPage": {
+    "title": "No documents found",
+    "body": "Add markdown files under specs/, docs/, or insights/ anywhere in the repo and they'll show up here."
+  },
+  "bucket": {
+    "specs": "Specs",
+    "docs": "Docs",
+    "insights": "Insights"
+  },
+  "row": {
+    "preview": "Preview",
+    "tokens": "≈{count} tokens"
+  },
+  "mode": {
+    "preview": "Preview",
+    "edit": "Edit"
+  },
+  "drawer": {
+    "close": "Close",
+    "loadError": "Couldn't load this document",
+    "resyncWarning": "This file is tracked in the repo. Saving here edits the local clone only — the next resync from the remote may overwrite your changes.",
+    "save": "Save",
+    "saveSuccess": "Saved",
+    "saveError": "Couldn't save this document"
+  }
+}

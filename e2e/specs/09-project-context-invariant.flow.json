@@ -1,0 +1,24 @@
+{
+  "name": "Project Context headline scenario — attached spec surfaces in the run trace and finding (AC-35)",
+  "description": "From PR #484 (seeded diff that imports db/ directly from api/), open the Agent runs tab and confirm the seeded Security Reviewer run shows the grounded finding referencing the architecture-invariant violation. Then open that run's trace and confirm the attached spec path (specs/architecture.md) appears under 'Specs read' and the wrapped invariant text is visible in the Prompt assembly 'Project context — attached specs (untrusted)' block. agent-browser has no LLM, so this run/trace is seeded pre-baked (matching exactly what a live run-executor pass injects) rather than produced live — see docs/plans/project-context.md Risk R-8. Read-only seeded data (no model call). Assumes a freshly-seeded DB where acme/payments-api is the first (only) repo — guaranteed by e2e-web.yml; run locally via the hermetic stack (see e2e/README.md).",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["wait", "--text", "Query the database directly from the public API layer"], "label": "seeded invariant-violation PR title row is visible" },
+    { "cmd": ["find", "text", "Query the database directly from the public API layer", "click"], "label": "open the seeded invariant-violation PR row" },
+    { "cmd": ["wait", "--url", "/pulls/484"], "label": "navigate to the PR detail route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Agent runs"], "label": "switch to the Agent runs tab" },
+    { "cmd": ["wait", "--url", "tab=findings"], "label": "findings tab is active in the URL" },
+    { "cmd": ["wait", "--text", "Security Reviewer"], "label": "seeded run accordion shows the agent name" },
+    { "cmd": ["wait", "--text", "request changes"], "label": "seeded run accordion shows its verdict" },
+    { "cmd": ["wait", "--text", "api/ imports db/ directly, violating the architecture invariant"], "label": "the grounded finding referencing the violation is visible" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Open run trace & logs"], "label": "open the run trace drawer" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "trace data settles" },
+    { "cmd": ["wait", "--text", "Specs read"], "label": "trace configuration shows the Specs read row" },
+    { "cmd": ["wait", "--text", "specs/architecture.md"], "label": "the attached spec path is listed under specs_read" },
+    { "cmd": ["find", "text", "Prompt assembly", "click"], "label": "expand the Prompt assembly section" },
+    { "cmd": ["find", "text", "Project context — attached specs (untrusted)", "click"], "label": "expand the Project-context prompt block" },
+    { "cmd": ["wait", "--text", "must not import `db/` directly"], "label": "the injected spec text (the invariant itself) is visible in the untrusted block" }
+  ]
+}

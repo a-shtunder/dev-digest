@@ -100,3 +100,5 @@ a CI artifact by `.github/workflows/e2e-web.yml`).
 | `05-pr-diff` | PR #482 → Files changed tab → seeded file renders in the diff viewer |
 | `06-onboarding` | `/onboarding` → add-repository form renders (no submit) |
 | `07-settings` | `/settings/api-keys` + `/settings/models` → section titles render |
+| `08-smart-diff` | PR #483 (mega-PR) → Files changed tab → Smart Diff grouping renders |
+| `09-project-context-invariant` | PR #484 → Agent runs tab → seeded Security Reviewer finding + run trace shows `specs/architecture.md` in specs_read and the invariant text in the Prompt assembly Project-context block (AC-35) |

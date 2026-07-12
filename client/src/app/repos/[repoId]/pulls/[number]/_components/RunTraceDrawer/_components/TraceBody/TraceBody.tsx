@@ -15,6 +15,16 @@ import { PromptBlock } from "../PromptBlock";
 import { FindingsSection } from "../FindingsSection";
 import { Row, Stat } from "../atoms";
 
+// Local variant of `s.spec` for missing/skipped spec paths — reuses the same
+// chip shape but in the warn color to visually distinguish it from `s.spec`
+// (specs that were actually read). Kept local to this file since `styles.ts`
+// is shared across the whole RunTraceDrawer tree.
+const specMissingStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: "var(--warn)",
+  textDecoration: "line-through",
+};
+
 export function TraceBody({ trace, findings }: { trace: RunTrace; findings: FindingRecord[] }) {
   const t = useTranslations("runs");
   const stats = trace.stats;
@@ -48,6 +58,17 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
               )}
             </div>
           </Row>
+          {trace.specs_missing.length > 0 && (
+            <Row label={t("trace.config.specsMissing")}>
+              <div style={s.specsWrap}>
+                {trace.specs_missing.map((sp, i) => (
+                  <span key={i} className="mono" style={specMissingStyle}>
+                    {sp}
+                  </span>
+                ))}
+              </div>
+            </Row>
+          )}
         </div>
       </TraceSection>
 

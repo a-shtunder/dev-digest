@@ -84,6 +84,10 @@ export const RunTrace = z.object({
   raw_output: z.string(),
   memory_pulled: z.array(MemoryPulled),
   specs_read: z.array(z.string()),
+  // Project Context: paths of attached documents that were selected for
+  // injection but could not be read at run time (missing/deleted/guard-
+  // rejected). Default [] keeps old persisted traces (JSONB) parsing.
+  specs_missing: z.array(z.string()).default([]),
   log: z.array(RunLogLine),
 });
 export type RunTrace = z.infer<typeof RunTrace>;

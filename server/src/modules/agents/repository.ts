@@ -145,6 +145,25 @@ export class AgentsRepository {
     return row;
   }
 
+  /**
+   * Persist the ordered list of attached doc paths for an agent. This is a
+   * targeted update of `attachedDocPaths` only — it never bumps `version` and
+   * never snapshots `agent_versions`, since attaching/reordering docs is not a
+   * config change (order in the array IS the attach order; no sort/dedupe).
+   */
+  async setAttachedDocs(
+    workspaceId: string,
+    id: string,
+    paths: string[],
+  ): Promise<AgentRow | undefined> {
+    const [row] = await this.db
+      .update(t.agents)
+      .set({ attachedDocPaths: paths })
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.id, id)))
+      .returning();
+    return row;
+  }
+
   private async snapshotVersion(row: AgentRow, version: number): Promise<void> {
     const skills = await this.skillIdsForAgent(row.id);
     await this.db

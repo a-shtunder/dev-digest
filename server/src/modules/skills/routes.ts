@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { SkillSource, SkillType } from "@devdigest/shared";
+import { SkillSource, SkillType, SetAttachedDocsBody } from "@devdigest/shared";
 import { getContext } from "../_shared/context.js";
 import { IdParams } from "../_shared/schemas.js";
 import { NotFoundError } from "../../platform/errors.js";
@@ -234,4 +234,21 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     if (!ok) throw new NotFoundError("Skill not found");
     return { ok: true };
   });
+
+  // Distinct from PUT /skills/:id — attaching/detaching docs never bumps
+  // `version`, snapshots skill_versions, or triggers a threat re-scan.
+  app.put(
+    "/skills/:id/attached-docs",
+    { schema: { params: IdParams, body: SetAttachedDocsBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      const skill = await service.setAttachedDocs(
+        workspaceId,
+        req.params.id,
+        req.body.paths,
+      );
+      if (!skill) throw new NotFoundError("Skill not found");
+      return skill;
+    },
+  );
 }

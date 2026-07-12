@@ -51,6 +51,7 @@ function toSkillDto(row: SkillRow): Skill {
     version: row.version,
     evidence_files: (row.evidenceFiles as string[] | null) ?? null,
     threat_level: (row.threatLevel as ThreatLevel) ?? THREAT_LEVEL.UNKNOWN,
+    attached_doc_paths: (row.attachedDocPaths as string[] | null) ?? [],
   };
 }
 
@@ -146,6 +147,19 @@ export class SkillsService {
     version: number,
   ): Promise<Skill | undefined> {
     const row = await this.repo.restore(workspaceId, id, version);
+    return row ? toSkillDto(row) : undefined;
+  }
+
+  /**
+   * Attach/detach docs on a skill. Does NOT touch `version`, `body`, or
+   * `threat_level` — see repository.setAttachedDocs.
+   */
+  async setAttachedDocs(
+    workspaceId: string,
+    id: string,
+    paths: string[],
+  ): Promise<Skill | undefined> {
+    const row = await this.repo.setAttachedDocs(workspaceId, id, paths);
     return row ? toSkillDto(row) : undefined;
   }
 }

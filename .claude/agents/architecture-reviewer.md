@@ -1,7 +1,7 @@
 ---
 name: architecture-reviewer
 description: Read-only architectural reviewer. Use to audit a diff or file set against DevDigest's documented structural contracts — onion layering, DI discipline, reviewer-core isolation, shared-contract usage. Reports violations; never edits.
-model: opus
+model: sonnet
 tools: Read, Glob, Grep
 skills:
   - onion-architecture          # backend layering — inward-only dependency rule

@@ -31,6 +31,10 @@ export const agents = pgTable('agents', {
   repoIntel: boolean('repo_intel').notNull().default(true),
   enabled: boolean('enabled').notNull().default(true),
   version: integer('version').notNull().default(1),
+  // Ordered repo-relative paths of attached project-context docs (Preview/Edit
+  // via project-context module). Paths only, never text; mutable config that
+  // does NOT bump `version` (see agents/repository.ts setAttachedDocs).
+  attachedDocPaths: jsonb('attached_doc_paths').$type<string[]>().notNull().default([]),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: now(),
 });

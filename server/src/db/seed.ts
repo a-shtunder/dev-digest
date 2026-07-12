@@ -453,6 +453,218 @@ export async function seed(
     if (!existing) await db.insert(t.agents).values(a);
   }
 
+  // ---- PR #484 + pre-baked run/trace (Project Context headline scenario) --
+  // agent-browser (e2e) has no LLM, so a live "grounded finding" is not
+  // deterministic there (see docs/plans/project-context.md Risk R-8). Instead
+  // this seeds: (1) a PR whose diff violates an architectural invariant
+  // ("module `api/` must not import `db/` directly"), (2) the Security
+  // Reviewer agent with that invariant spec attached via `attachedDocPaths`,
+  // and (3) a pre-baked agent_runs/run_traces/reviews/findings row set that
+  // mirrors exactly what a real run-executor pass injects (specs_read +
+  // prompt_assembly.specs wrapped untrusted) — so the e2e flow can assert
+  // injection visibility + the grounded finding deterministically, without a
+  // live model call.
+  const ARCHITECTURE_SPEC_PATH = "specs/architecture.md";
+  const ARCHITECTURE_SPEC_TEXT =
+    "# Architecture Invariants\n\n" +
+    "- Module `api/` must not import `db/` directly. All data access must go " +
+    "through the `services/` layer so query logic stays testable and reusable.\n";
+  const apiUsersPatch = [
+    "@@ -1,4 +1,7 @@",
+    " import { Router } from 'express';",
+    "+import { db } from '../db/client';",
+    " ",
+    " const router = Router();",
+    "+router.get('/users/:id', async (req, res) => {",
+    "+  const [user] = await db.query('SELECT * FROM users WHERE id = $1', [req.params.id]);",
+    "+  res.json(user);",
+    "+});",
+  ].join("\n");
+
+  let [invariantPr] = await db
+    .select()
+    .from(t.pullRequests)
+    .where(
+      and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.number, 484)),
+    );
+  if (!invariantPr) {
+    [invariantPr] = await db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId,
+        number: 484,
+        title: "Query the database directly from the public API layer",
+        author: "priya.natarajan",
+        branch: "perf/inline-db-query",
+        base: "main",
+        headSha: "b9c8d7e6f5a4",
+        additions: 5,
+        deletions: 0,
+        filesCount: 1,
+        status: "needs_review",
+        body: "Skips the service layer and queries the users table directly from the API handler to shave a hop off the hot path.",
+      })
+      .returning();
+
+    await db.insert(t.prFiles).values([
+      {
+        prId: invariantPr!.id,
+        path: "src/api/users.ts",
+        additions: 5,
+        deletions: 0,
+        patch: apiUsersPatch,
+      },
+    ]);
+
+    await db.insert(t.prCommits).values({
+      prId: invariantPr!.id,
+      sha: "b9c8d7e6f5a4",
+      message: "Query users table directly from the API handler",
+      author: "priya.natarajan",
+    });
+  }
+
+  // Attach the invariant spec to the Security Reviewer. Set unconditionally
+  // (idempotent) so re-running the seed against a DB created before this
+  // task also fixes up an already-existing Security Reviewer row.
+  const [securityReviewer] = await db
+    .select()
+    .from(t.agents)
+    .where(
+      and(
+        eq(t.agents.workspaceId, workspaceId),
+        eq(t.agents.name, "Security Reviewer"),
+      ),
+    );
+
+  if (securityReviewer && invariantPr) {
+    await db
+      .update(t.agents)
+      .set({ attachedDocPaths: [ARCHITECTURE_SPEC_PATH] })
+      .where(eq(t.agents.id, securityReviewer.id));
+
+    const [existingRun] = await db
+      .select()
+      .from(t.agentRuns)
+      .where(
+        and(
+          eq(t.agentRuns.workspaceId, workspaceId),
+          eq(t.agentRuns.prId, invariantPr.id),
+          eq(t.agentRuns.agentId, securityReviewer.id),
+        ),
+      );
+
+    if (!existingRun) {
+      const [run] = await db
+        .insert(t.agentRuns)
+        .values({
+          workspaceId,
+          agentId: securityReviewer.id,
+          prId: invariantPr.id,
+          provider: "openai",
+          model: "gpt-4.1",
+          durationMs: 8400,
+          tokensIn: 1520,
+          tokensOut: 210,
+          costUsd: 0.014,
+          status: "done",
+          source: "local",
+          findingsCount: 1,
+          grounding: "1/1 findings grounded",
+          score: 42,
+          blockers: 1,
+        })
+        .returning();
+
+      const [invariantReview] = await db
+        .insert(t.reviews)
+        .values({
+          workspaceId,
+          prId: invariantPr.id,
+          agentId: securityReviewer.id,
+          runId: run!.id,
+          kind: "review",
+          verdict: "request_changes",
+          summary:
+            "Queries the users table directly from the API layer, violating the architecture invariant that `api/` must not import `db/` directly.",
+          score: 42,
+          model: "gpt-4.1",
+        })
+        .returning();
+
+      await db.insert(t.findings).values({
+        reviewId: invariantReview!.id,
+        file: "src/api/users.ts",
+        startLine: 2,
+        endLine: 6,
+        severity: "CRITICAL",
+        category: "security",
+        title: "api/ imports db/ directly, violating the architecture invariant",
+        rationale:
+          "`src/api/users.ts` imports `../db/client` and queries the users table directly from the route handler. `specs/architecture.md` states that module `api/` must not import `db/` directly — all data access must go through the `services/` layer.",
+        suggestion:
+          "Move the query into a service function (e.g. `services/users.ts`) and call that from the route handler instead of importing `db/` directly.",
+        confidence: 0.93,
+      });
+
+      const promptSpecsBlock = `<untrusted source="spec-0">\n${ARCHITECTURE_SPEC_TEXT}\n</untrusted>`;
+
+      await db.insert(t.runTraces).values({
+        runId: run!.id,
+        trace: {
+          config: {
+            agent: "Security Reviewer",
+            version: "1",
+            provider: "openai",
+            model: "gpt-4.1",
+            pr: 484,
+            source: "local",
+          },
+          stats: {
+            duration_ms: 8400,
+            tokens_in: 1520,
+            tokens_out: 210,
+            cost_usd: 0.014,
+            findings: 1,
+            grounding: "1/1 findings grounded",
+          },
+          prompt_assembly: {
+            system:
+              "You are a security-focused PR reviewer. Examine the diff for hardcoded secrets, injection, SSRF, and untrusted input reaching a dangerous sink. Return at most 5 findings ranked by severity. Cite exact file:line.",
+            skills: null,
+            memory: null,
+            specs: promptSpecsBlock,
+            callers: null,
+            repo_map: null,
+            pr_description:
+              "Skips the service layer and queries the users table directly from the API handler to shave a hop off the hot path.",
+            user: `## Diff\n${apiUsersPatch}`,
+          },
+          tool_calls: [],
+          raw_output:
+            "1 finding: api/ imports db/ directly, violating the architecture invariant (CRITICAL).",
+          memory_pulled: [],
+          specs_read: [ARCHITECTURE_SPEC_PATH],
+          specs_missing: [],
+          log: [
+            {
+              t: "00.01",
+              kind: "info",
+              msg: 'Starting review with agent "Security Reviewer" (openai/gpt-4.1)',
+            },
+            {
+              t: "00.02",
+              kind: "info",
+              msg: "Project context: 1 attached spec doc(s) injected",
+            },
+            { t: "08.40", kind: "result", msg: "1 finding, verdict request_changes" },
+          ],
+        },
+      });
+    }
+  }
+
   // ---- skills (6 reusable instruction blocks) ----
   const seedSkills: Array<{
     slug: string;

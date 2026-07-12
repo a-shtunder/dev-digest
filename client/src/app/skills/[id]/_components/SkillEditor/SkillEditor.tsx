@@ -7,6 +7,7 @@ import type { Skill } from "@devdigest/shared";
 import { useUpdateSkill } from "@/lib/hooks/skills";
 import { resolveSkillThreat } from "@/lib/skill-threat";
 import { ConfigTab } from "./_components/ConfigTab/ConfigTab";
+import { ContextTab } from "./_components/ContextTab/ContextTab";
 import { PreviewTab } from "./_components/PreviewTab/PreviewTab";
 import { StatsTab } from "./_components/StatsTab/StatsTab";
 import { VersionsTab } from "./_components/VersionsTab/VersionsTab";
@@ -16,6 +17,7 @@ const VALID_TABS = TABS as readonly string[];
 
 const TAB_DEFS = [
   { key: "config", label: "Config", icon: "Settings" as const },
+  { key: "context", label: "Context", icon: "FileText" as const },
   { key: "preview", label: "Preview", icon: "Eye" as const },
   { key: "stats", label: "Stats", icon: "BarChart" as const },
   { key: "versions", label: "Versions", icon: "Clock" as const },
@@ -164,6 +166,7 @@ export function SkillEditor({
       {/* Tab body */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {activeTab === "config" && <ConfigTab skill={skill} />}
+        {activeTab === "context" && <ContextTab skill={skill} />}
         {activeTab === "preview" && <PreviewTab skill={skill} />}
         {activeTab === "stats" && <StatsTab skillId={skill.id} />}
         {activeTab === "versions" && <VersionsTab skill={skill} />}

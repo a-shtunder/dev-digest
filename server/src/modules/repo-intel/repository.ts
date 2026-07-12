@@ -126,6 +126,10 @@ export interface FullSymbolRow {
 export interface ResolvedCallerRow {
   fromPath: string;
   toSymbol: string;
+  /** The exact changed file this reference resolved against — the query's
+   *  WHERE clause already constrains this to one of `declFiles`, so it's
+   *  never null in a returned row; typed nullable to match the DB column. */
+  declFile: string | null;
   line: number;
   rank: number;
 }
@@ -428,12 +432,23 @@ export class RepoIntelRepository {
   // T3 — reads (facade + repo-map).
   // -------------------------------------------------------------------------
 
-  /** All import edges for a repo (rank graph build + critical-paths). */
-  async getEdges(repoId: string): Promise<IndexerEdgeRow[]> {
+  /**
+   * Import edges for a repo (rank graph build + critical-paths + blast-radius
+   * BFS hops). Pass `toFiles` to scope to edges landing on a specific
+   * frontier (e.g. "who imports these caller files") instead of pulling every
+   * edge in the repo — the unscoped form is still available for callers that
+   * genuinely need the whole graph (rank build, critical-paths).
+   */
+  async getEdges(repoId: string, opts?: { toFiles?: string[] }): Promise<IndexerEdgeRow[]> {
+    if (opts?.toFiles && opts.toFiles.length === 0) return [];
     return this.db
       .select({ fromFile: t.fileEdges.fromFile, toFile: t.fileEdges.toFile })
       .from(t.fileEdges)
-      .where(eq(t.fileEdges.repoId, repoId));
+      .where(
+        opts?.toFiles
+          ? and(eq(t.fileEdges.repoId, repoId), inArray(t.fileEdges.toFile, opts.toFiles))
+          : eq(t.fileEdges.repoId, repoId),
+      );
   }
 
   /** `{path, percentile}` for the given paths (smart-diff / run-executor). */
@@ -510,6 +525,7 @@ export class RepoIntelRepository {
       .select({
         fromPath: t.references.fromPath,
         toSymbol: t.references.toSymbol,
+        declFile: t.references.declFile,
         line: t.references.line,
         rank: t.fileRank.rank,
       })

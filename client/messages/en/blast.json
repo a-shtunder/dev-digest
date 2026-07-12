@@ -14,5 +14,23 @@
   "graph": {
     "empty": "No downstream callers to graph.",
     "ariaLabel": "Blast radius graph"
+  },
+  "sectionLabel": "Blast Radius",
+  "empty": {
+    "title": "No blast radius data",
+    "body": "This repo hasn't been indexed yet, or no symbols were declared in the changed files."
+  },
+  "degraded": {
+    "badge": "Partial index",
+    "reason": {
+      "flag_off": "Code intelligence is disabled for this repo.",
+      "index_failed": "Indexing failed — showing best-effort data.",
+      "index_partial": "Index still building — results may be incomplete.",
+      "repo_too_large": "Repo too large for full indexing — results may be incomplete.",
+      "no_data": "No index data yet for this repo."
+    }
+  },
+  "priorPrs": {
+    "stub": "Prior PRs touching these files — not available yet"
   }
 }

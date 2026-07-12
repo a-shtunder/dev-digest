@@ -8,26 +8,54 @@ trigger rules ("Use proactively when…").
 | Agent | Model | Role | Writes code? |
 |-------|-------|------|--------------|
 | [`researcher`](./researcher.md) | sonnet | Read-only research (project + internet), strict structured output | No |
-| [`planner`](./planner.md) | opus | Read-only architect — produces a structured Development Plan | No (only the plan file) |
+| [`implementation-planner`](./implementation-planner.md) | opus | Read-only architect — reviews requirements, confirms execution mode, produces a structured Implementation Plan | No (only the plan file) |
 | [`implementer`](./implementer.md) | sonnet | Implements ONE task from a plan (backend or UI), self-verifies | Yes |
 | [`test-writer`](./test-writer.md) | sonnet | Writes unit + integration tests (backend + reviewer-core), self-verifies | Yes |
-| [`architecture-reviewer`](./architecture-reviewer.md) | opus | Read-only structural/architecture review of a diff or file set | No |
-| [`plan-verifier`](./plan-verifier.md) | opus | Read-only requirements-completion / traceability check | No |
+| [`architecture-reviewer`](./architecture-reviewer.md) | sonnet | Read-only structural/architecture review of a diff or file set | No |
+| [`plan-verifier`](./plan-verifier.md) | sonnet | Read-only requirements-completion / traceability check | No |
 | [`doc-writer`](./doc-writer.md) | sonnet | Writes documentation (Diátaxis + Mermaid), knows where docs belong | Yes |
+| [`spec-creator`](./spec-creator.md) | opus | Writes/updates Spec-Driven Development specs (EARS acceptance criteria), analyzes pasted designs for gaps, Q&A-first | Yes (only `specs/`) |
 
 ## Intended workflow
 
 ```
 you / main session
-   └─ planner (opus, read-only) → docs/plans/<feature>.md
-         (phased tasks with Type · Skills · Owned paths · Depends-on · Acceptance)
-         └─ N× implementer (sonnet, parallel) — one task each, inside its Owned paths
-               └─ pr-self-review (existing skill) — final gate before push
+   └─ spec-creator (opus, writes only specs/) → specs/SPEC-NN-<feature>.md   [optional, for features
+         (Q&A-first: clarifies + analyzes any pasted design before writing)   worth a spec]
+         └─ implementation-planner (opus, read-only) → docs/plans/<feature>.md
+               (requirements review + execution-mode confirmation, then phased tasks with
+                Type · Skills · Owned paths · Depends-on · Acceptance)
+               └─ N× implementer (sonnet, parallel or sequential per confirmed mode) — one task each, inside its Owned paths
+                     └─ plan-verifier (opus, read-only) — cheap completeness gate BEFORE the costly reviews
+                     │     ├─ FAIL / partial → fix with a targeted implementer task → re-run plan-verifier
+                     │     └─ PASS / review  ↓
+                     ├─ architecture-reviewer + test-writer (fresh context; independent, run in parallel)
+                     │     (plan-verifier's Pass-2 "test coverage" gaps are handed to test-writer as input)
+                     └─ pr-self-review (existing skill) — final gate before push
 ```
 
+**Why `plan-verifier` runs first.** It is the cheapest check in the chain (read-only, targeted
+grep→glob→read), while `architecture-reviewer` (opus, reads the whole diff + all doctrine docs) is
+expensive. There is no point paying for a structural review of code that isn't fully implemented
+yet — so verify completeness first, close any `missing`/`partial` gaps with a small implementer
+task, and only then spend the reviewers. `plan-verifier`'s Pass-2 already surfaces test-coverage
+gaps, which feed `test-writer` directly instead of it re-discovering them. A second `plan-verifier`
+pass at the very end is optional — worth it only if `test-writer`/`architecture-reviewer` touched
+files that affect acceptance criteria, not as a reflexive re-run.
+
+**Closing the Spec → Plan → Code loop.** When a spec exists, after `plan-verifier` reports PASS,
+re-invoke `spec-creator` once to fill the spec's `Planned in` link (→ `docs/plans/<feature>.md`) and,
+with human confirmation, propose `Status: implemented`. No other agent writes to `specs/`, so this
+back-edit is the only thing that keeps traceability bidirectional.
+
+Not every change needs a spec — `spec-creator` is a step ahead of `implementation-planner` for
+features that meet the bar in `specs/README.md` (cross-module impact, nontrivial edge cases). When a
+spec exists, it becomes the requirements input `implementation-planner` reviews instead of an ad-hoc
+ask.
+
 The pipeline mirrors Claude Code's recommended **Explore → Plan → Implement → Commit** loop: the
-planner runs read-only during Plan, the implementers run during Implement, and review stays a
-separate fresh-context step.
+implementation-planner runs read-only during Plan, the implementers run during Implement, and review
+stays a separate fresh-context step.
 
 ---
 
@@ -35,18 +63,22 @@ separate fresh-context step.
 
 Pre-existing read-only research agent. Finds information inside the project or on the public
 internet and returns it in a strict template. Never edits files, never runs deep-research. The
-planner and implementer both follow its writing conventions (YAML frontmatter + Hard rules + fixed
-output template).
+implementation-planner and implementer both follow its writing conventions (YAML frontmatter + Hard
+rules + fixed output template).
 
 ---
 
-## `planner`
+## `implementation-planner`
 
-**What it does.** Turns a request into a structured, file-specific **Development Plan** written to
-`docs/plans/<feature>.md`. Knows every DevDigest module (`server/`, `client/`, `reviewer-core/`,
-`e2e/`, `@devdigest/shared`) and assigns each task a `Type`, a skill set, non-overlapping
-`Owned paths`, dependencies (a DAG), known gotchas from module insights, and measurable acceptance
-criteria. Read-only except for the plan file.
+**What it does.** Reviews the requirements it's given (never authors a specification), asks
+clarifying questions and surfaces recommendations when the requirements are unclear or could be
+satisfied more simply, confirms with the user whether the plan should target multi-agent (parallel)
+or single-agent (sequential) execution, and then turns the request into a structured, file-specific
+**Implementation Plan** written to `docs/plans/<feature>.md`. Knows every DevDigest module
+(`server/`, `client/`, `reviewer-core/`, `e2e/`, `@devdigest/shared`) and assigns each task a `Type`,
+a skill set, `Owned paths` (non-overlapping when the mode is multi-agent), dependencies (a DAG),
+known gotchas from module insights, and measurable acceptance criteria. Read-only except for the
+plan file.
 
 **Carries the full skill set.** It preloads the same skills the implementer uses (backend + UI +
 core practices) plus `mermaid-diagram`, on purpose: it plans the implementation, so every practice
@@ -68,7 +100,7 @@ an implementer must follow has to be reflected in the plan.
 
 ## `implementer`
 
-**What it does.** Implements exactly one task from a Development Plan — backend (Fastify/Drizzle/
+**What it does.** Implements exactly one task from an Implementation Plan — backend (Fastify/Drizzle/
 onion) or UI (Next.js/React) — and brings it to green. Runs in parallel with other implementers on
 the **same branch** (no worktree isolation), so staying inside the task's `Owned paths` is what
 keeps the parallel run safe. Its self-check is narrow: write the code and make the module's existing
@@ -151,7 +183,7 @@ only.
 ## `plan-verifier`
 
 **What it does.** A **read-only** completeness checker (`tools: Read, Glob, Grep, Bash` — no
-`Edit` or `Write`). Given a Development Plan, it walks every requirement and acceptance criterion,
+`Edit` or `Write`). Given an Implementation Plan, it walks every requirement and acceptance criterion,
 searches for the concrete implementing artifact (grep → structural glob → read), quotes verbatim
 evidence, and assigns one of four statuses: `done | partial | missing | cannot-verify`. `Bash` is
 used only to run grep/typecheck commands and capture output as evidence — never to modify state.
@@ -201,6 +233,73 @@ gotchas) are appended back to `<module>/insights/`.
 - **Architecture Decision Record conventions** — [Architecture Decision Record (Martin Fowler)](https://martinfowler.com/bliki/ArchitectureDecisionRecord.html)
 - **ADR best practices** — [Master ADRs (AWS)](https://aws.amazon.com/blogs/architecture/master-architecture-decision-records-adrs-best-practices-for-effective-decision-making/)
 - **Avoiding AI writing pitfalls** — [avoid-ai-writing SKILL.md (GitHub)](https://github.com/conorbronsdon/avoid-ai-writing/blob/main/SKILL.md)
+
+---
+
+## `spec-creator`
+
+**What it does.** Writes and updates Spec-Driven Development (SDD) specifications in a single flat
+`specs/` folder at the repo root (`specs/SPEC-NN-<feature>.md`, naskrizna numbering via `max+1`).
+Every acceptance criterion is written as one of five EARS patterns (ubiquitous / event-driven /
+state-driven / unwanted-behavior / optional-feature) plus a behavior-level verification hint, so it
+collapses into a single testable statement instead of a vague adjective. When the user pastes or
+points to design material, it actively hunts for what the design *doesn't* show — missing corner
+cases, undefined cross-module communication, UX gaps — and turns every gap into a clarifying
+question or proposal. It is **Q&A-first**: all open questions are asked and answered in chat before
+any file is written, so a finished spec should not normally carry an unresolved
+`[NEEDS CLARIFICATION: …]`. Specs are living documents — there is no "supersedes" relationship; an
+existing spec is edited in place and every change (including status changes) is appended to its
+`## Changelog`. `Status` transitions (`draft` → `approved` → `implemented`) can be *proposed* by the
+agent (backed by a `Grep` spot-check per AC) but require explicit human confirmation before the
+field is edited. A `Planned in` header line tracks the link to an Implementation Plan once one
+exists, so Spec → Plan → Code stays traceable in both directions. Every draft runs a Self-check
+checklist (EARS validity, no code leakage, numbering, Non-functional coverage, Changelog, Status
+gate) before it's saved.
+
+**Scope lock.** `tools: Read, Glob, Grep, Write, Edit, Agent` — no `Bash`. The only paths it may
+write to are `specs/*.md` and `specs/README.md`; this is enforced by instruction in its own body
+(soft constraint), not by a hook. `Agent` is scoped to delegating to `researcher` only (never to
+`implementer`/`implementation-planner`), for information the local docs/insights/code don't have —
+it may fan out multiple `researcher` calls in parallel and keep the raw research out of its own
+context. Design sources are never fetched or invented — the user supplies them in the conversation
+or as a local file path. A spec may describe diagrams, workflows, cross-service communication, and
+contract shapes (field names/types/validation intent) — it may never contain implementation detail
+(file paths to create, function names, code snippets, library choices); that line is enforced
+explicitly in the agent's Hard rules, including an explicit warning that the `zod`/`security` skills
+will surface code-shaped examples that must be translated to prose, never pasted verbatim.
+
+**Skill routing.** `onion-architecture` and `frontend-architecture` let it reason accurately about
+which module owns what and how modules actually talk to each other when analyzing a design's
+cross-module gaps. `mermaid-diagram` covers workflow/sequence diagrams. `zod` lets it describe
+contract shapes precisely (and name existing `@devdigest/shared` contracts) without writing schema
+code. `security` grounds the `Non-functional` and `Untrusted inputs` sections in concrete OWASP
+concerns instead of "should be secure." `typescript-expert` is for spot-checking `Status: implemented`
+proposals — reading existing types/routes accurately before citing them as evidence. `zod` and
+`security` surface code-shaped examples; the agent's own Hard rules require translating those into
+prose/tables, never pasting the syntax into a spec. `<module>/insights/gotchas.md` and
+`INSIGHTS.md` are read directly (via `Read`, no skill needed) as the primary source for
+`## Edge cases` — no skill is loaded for this since the agent only ever reads them, never writes.
+
+**Pre-existing `<module>/specs/` folders.** `client/specs/`, `server/specs/`, `reviewer-core/specs/`,
+and `e2e/specs/` already existed before this agent and hold a different, older kind of document —
+technical flow descriptions (`review-flow.md`, `pages.md`, `grounding-spec.md`, e2e `*.flow.json`),
+not SDD specs. `spec-creator` treats them as read-only grounding context and never writes into them;
+its only write target is the root `specs/` folder, which is documented in `specs/README.md`.
+
+**Based on:**
+
+- **EARS (Easy Approach to Requirements Syntax)** — Alistair Mavin et al., Rolls-Royce, 2009;
+  adopted here because each of the five patterns collapses a requirement into one unambiguous,
+  testable statement (trigger + reaction), which is what an `implementer` or `plan-verifier` needs
+  to check work against.
+- **Spec-driven development with agentic AI** — same source underpinning `plan-verifier`'s
+  traceability approach: [Spec-Driven Development with Agentic AI (ArceApps)](https://arceapps.com/blog/spec-driven-development-ai/)
+- **`description` as a trigger rule for proactive routing** — [Claude Code subagents docs](https://code.claude.com/docs/en/sub-agents)
+- **Read-only-until-confirmed drafting (Q&A-first)** — mirrors `implementation-planner`'s
+  "Clarify & recommend" step, applied one layer earlier in the pipeline (spec, not plan)
+- **Untrusted-input boundary carried into spec content** — same `wrapUntrusted()` seam documented in
+  `reviewer-core/docs/pipeline.md`, so specs for features that read PR/issue/commit text explicitly
+  flag that content as data, not instructions
 
 ---
 

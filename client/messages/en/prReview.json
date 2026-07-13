@@ -7,12 +7,12 @@
     "dismiss": "Dismiss",
     "learn": "Learn",
     "replyToAuthor": "Reply to author",
-    "replyPlaceholder": "Reply to the author about this finding…",
+    "replyPlaceholder": "Reply to the author about this finding\u2026",
     "sendReply": "Send reply",
     "cancel": "Cancel"
   },
   "trifecta": {
-    "lethal": "LETHAL TRIFECTA — ALL 3 PRESENT",
+    "lethal": "LETHAL TRIFECTA \u2014 ALL 3 PRESENT",
     "components": "TRIFECTA COMPONENTS",
     "privateData": "Private data",
     "untrustedInput": "Untrusted input",
@@ -23,7 +23,7 @@
     "approve": "Approve",
     "comment": "Comment",
     "findingsCount": "{count} findings",
-    "blockers": " · {count} blockers",
+    "blockers": " \u00b7 {count} blockers",
     "prScore": "PR SCORE"
   },
   "panel": {
@@ -36,14 +36,14 @@
   },
   "runReview": {
     "runAll": "Run all enabled agents",
-    "configureAgents": "Configure agents…",
-    "running": "Running…",
+    "configureAgents": "Configure agents\u2026",
+    "running": "Running\u2026",
     "runReview": "Run Review",
-    "mergedWarning": "Already merged — review is informational",
-    "mergedTooltip": "This PR is already merged; running a review won’t affect the merged code."
+    "mergedWarning": "Already merged \u2014 review is informational",
+    "mergedTooltip": "This PR is already merged; running a review won\u2019t affect the merged code."
   },
   "runStatus": {
-    "elapsed": "Running · {count} agent(s)",
+    "elapsed": "Running \u00b7 {count} agent(s)",
     "approved": "approved",
     "reviewed": "reviewed",
     "rejected": "rejected",
@@ -51,7 +51,7 @@
     "cancelled": "cancelled",
     "running": "running",
     "findings": "{count} finding(s)",
-    "blockers": " · {count} blockers"
+    "blockers": " \u00b7 {count} blockers"
   },
   "smartDiff": {
     "coreLabel": "Core",
@@ -61,13 +61,13 @@
     "largeBody": "Consider splitting it into smaller, focused PRs for easier review:",
     "filesCount": "{count} files",
     "findingLines": "{count} finding-lines",
-    "groupedByRole": "Smart Diff · grouped by role"
+    "groupedByRole": "Smart Diff \u00b7 grouped by role"
   },
   "list": {
     "breadcrumb": "Pull Requests",
     "title": "Pull Requests",
-    "summary": "{open} open · {needsReview} need review",
-    "loading": "Loading pull requests…",
+    "summary": "{open} open \u00b7 {needsReview} need review",
+    "loading": "Loading pull requests\u2026",
     "status": {
       "open": "Open",
       "closed": "Closed",
@@ -83,8 +83,8 @@
       "stale": "Stale"
     },
     "refresh": "Refresh",
-    "refreshing": "Refreshing…",
-    "filterPlaceholder": "Filter pull requests…",
+    "refreshing": "Refreshing\u2026",
+    "filterPlaceholder": "Filter pull requests\u2026",
     "sort": {
       "newest": "Sort: Newest",
       "oldest": "Sort: Oldest"
@@ -100,19 +100,22 @@
       "updated": "Updated"
     },
     "filesCount": "{count} files",
-    "errorTitle": "Couldn’t load pull requests",
+    "errorTitle": "Couldn\u2019t load pull requests",
     "errorBody": "The engine returned an error.",
     "emptyTitle": "No pull requests",
     "emptyAllBody": "No open PRs found for this repo yet. Refresh to sync from GitHub.",
-    "emptyStatusBody": "No PRs with status “{status}”."
+    "emptyStatusBody": "No PRs with status \u201c{status}\u201d."
   },
   "timeline": {
-    "goToReview": "Jump to this run’s findings below",
+    "goToReview": "Jump to this run\u2019s findings below",
     "openTrace": "Open run trace & logs",
     "deleteRun": "Delete run"
   },
   "overview": {
-    "descriptionLabel": "Description"
+    "descriptionLabel": "Description",
+    "runSummaryTitle": "Latest run",
+    "costSum": "Total cost: ${cost}",
+    "viewFindings": "View {severity} findings"
   },
   "intent": {
     "sectionLabel": "Intent",

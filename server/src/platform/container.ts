@@ -32,6 +32,7 @@ import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 import { WebFetchAdapter } from '../adapters/http/web-fetch.js';
+import { BriefService } from '../modules/brief/service.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -83,6 +84,7 @@ export class Container {
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
   private _webFetch?: WebFetchClient;
+  private _briefService?: BriefService;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -116,6 +118,11 @@ export class Container {
 
   get reviewRepo(): ReviewRepository {
     return (this._reviewRepo ??= new ReviewRepository(this.db));
+  }
+
+  /** Why+Risk PR Brief Card orchestration (T6/T7). Lazy, mirrors other services. */
+  get briefService(): BriefService {
+    return (this._briefService ??= new BriefService(this));
   }
 
   get codeIndex(): CodeIndex {

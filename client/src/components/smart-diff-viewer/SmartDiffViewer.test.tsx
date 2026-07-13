@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord, PrFile, SmartDiff } from "@devdigest/shared";
-import messages from "../../../messages/en/shell.json";
+import shellMessages from "../../../messages/en/shell.json";
+import briefCardMessages from "../../../messages/en/brief-card.json";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -11,11 +12,20 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// core_summaries is mutable per-test via this holder — mocked at the hook
+// boundary (`useBrief`) instead of the network, matching how the rest of the
+// hint's data (the Brief) is already fetched/cached elsewhere on the PR page.
+let mockCoreSummaries: Record<string, string> = {};
+vi.mock("@/lib/hooks", () => ({
+  useBrief: () => ({ data: { core_summaries: mockCoreSummaries } }),
+}));
+
 import { SmartDiffViewer } from "./SmartDiffViewer";
 
 afterEach(() => {
   cleanup();
   push.mockClear();
+  mockCoreSummaries = {};
 });
 
 const FILES: PrFile[] = [
@@ -102,7 +112,10 @@ const FINDINGS: FindingRecord[] = [
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ shell: messages }}>
+    <NextIntlClientProvider
+      locale="en"
+      messages={{ shell: shellMessages, "brief-card": briefCardMessages }}
+    >
       {ui}
     </NextIntlClientProvider>,
   );
@@ -172,12 +185,32 @@ describe("SmartDiffViewer", () => {
     expect(screen.getByText("blocker")).toBeInTheDocument();
   });
 
-  it('renders "What this does" when pseudocode_summary is present, and omits it when null', () => {
-    renderWithIntl(<SmartDiffViewer files={FILES} smartDiff={SMART_DIFF} findings={FINDINGS} />);
+  it("renders the AI-generated hint for a core file with a Brief core_summaries entry", () => {
+    mockCoreSummaries = {
+      "src/payments/webhook-processor.ts": "Verifies the webhook signature and dispatches to the ledger.",
+    };
+    renderWithIntl(<SmartDiffViewer files={FILES} smartDiff={SMART_DIFF} findings={FINDINGS} prId="pr-1" />);
     expect(
       screen.getByText("Verifies the webhook signature and dispatches to the ledger.", { exact: false }),
     ).toBeInTheDocument();
     expect(screen.getByText("What this does:", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("AI-generated")).toBeInTheDocument();
+  });
+
+  it("renders no hint for a core file absent from core_summaries", () => {
+    mockCoreSummaries = {};
+    renderWithIntl(<SmartDiffViewer files={FILES} smartDiff={SMART_DIFF} findings={FINDINGS} prId="pr-1" />);
+    expect(screen.queryByText("What this does:", { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByText("AI-generated")).not.toBeInTheDocument();
+  });
+
+  it("renders no hint for a wiring/boilerplate file even when core_summaries has an entry for it", () => {
+    mockCoreSummaries = { "pnpm-lock.yaml": "Should never render — this file is boilerplate." };
+    renderWithIntl(<SmartDiffViewer files={FILES} smartDiff={SMART_DIFF} findings={FINDINGS} prId="pr-1" />);
+    // Expand the boilerplate group first (collapsed by default).
+    fireEvent.click(screen.getByText("Boilerplate"));
+    expect(screen.getByText("pnpm-lock.yaml")).toBeInTheDocument();
+    expect(screen.queryByText("Should never render — this file is boilerplate.")).not.toBeInTheDocument();
   });
 
   it("renders the split_suggestion banner only when too_big is true", () => {

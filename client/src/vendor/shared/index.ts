@@ -3,7 +3,7 @@
  *
  * Exports (Zod schemas + inferred TS types):
  *  - contracts/findings   Review, Finding, Severity, Verdict, FindingAction, trifecta
- *  - contracts/brief      Intent, BlastRadius, Risks, PrHistory, SmartDiff, PrBrief
+ *  - contracts/brief      Intent, BlastRadius, Risks, SmartDiff
  *  - contracts/knowledge  Conformance, Onboarding, EvalRun/EvalCase, MemoryItem,
  *                         Skill/CommunitySkill, ConventionCandidate, Agent
  *  - contracts/trace      RunTrace, RunEvent, RunLogLine (single-document trace)
@@ -26,4 +26,5 @@ export * from './contracts/observability';
 export * from './contracts/productionize';
 export * from './contracts/blast';
 export * from './contracts/project-context';
+export * from './contracts/pr-brief-card';
 export * from './adapters';

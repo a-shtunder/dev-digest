@@ -6,6 +6,9 @@ import { SectionLabel } from "@devdigest/ui";
 import { s } from "./styles";
 import { IntentCard } from "./IntentCard";
 import { BlastRadiusCard } from "./BlastRadiusCard";
+import { PrBriefCard } from "../PrBriefCard/PrBriefCard";
+import { ReviewRunOverview } from "../ReviewRunOverview/ReviewRunOverview";
+import { ReviewFocusCard } from "../ReviewFocusCard/ReviewFocusCard";
 
 interface OverviewTabProps {
   prBody: string | null | undefined;
@@ -19,14 +22,23 @@ export function OverviewTab({ prBody, prId, repoFullName, headSha }: OverviewTab
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {prId && (
-        <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <IntentCard prId={prId} />
+        <>
+          {/* Full-width verdict block at the top, matching the PR-brief design. */}
+          <ReviewRunOverview prId={prId} />
+
+          <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 20 }}>
+              <PrBriefCard prId={prId} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 20 }}>
+              <IntentCard prId={prId} />
+              <BlastRadiusCard prId={prId} repoFullName={repoFullName} headSha={headSha} />
+            </div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <BlastRadiusCard prId={prId} repoFullName={repoFullName} headSha={headSha} />
-          </div>
-        </div>
+
+          {/* Full-width, titled — its own section, not nested inside PrBriefCard. */}
+          <ReviewFocusCard prId={prId} />
+        </>
       )}
       {prBody && (
         <section>

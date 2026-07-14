@@ -12,6 +12,7 @@ import { Icon, SEV } from "@devdigest/ui";
 import type { FindingRecord, PrFile, Severity, SmartDiff, SmartDiffFile } from "@devdigest/shared";
 import { FileCard } from "@/components/diff-viewer/FileCard";
 import type { SeverityChipLabels } from "@/components/diff-viewer/CodeLine";
+import { useBrief } from "@/lib/hooks";
 import { ROLE_META } from "./constants";
 
 /** Sum of additions/deletions across every file in the SmartDiff. */
@@ -78,6 +79,7 @@ function SmartDiffGroupSection({
   severityLabels,
   summaryLabel,
   summaryChipLabel,
+  coreSummaries,
   onNavigateToFinding,
 }: {
   role: "core" | "wiring" | "boilerplate";
@@ -88,6 +90,9 @@ function SmartDiffGroupSection({
   severityLabels: SeverityChipLabels;
   summaryLabel: string;
   summaryChipLabel: string;
+  /** Per-file AI-generated hint text from the Brief response's `core_summaries`,
+      keyed by file path. Only ever rendered for `role: 'core'` files (AC-15). */
+  coreSummaries: Record<string, string>;
   /** Navigates to the Findings tab, deep-linked to a specific finding. */
   onNavigateToFinding: (findingId: string) => void;
 }) {
@@ -142,23 +147,33 @@ function SmartDiffGroupSection({
             if (!file) return null;
             const marksByLine = severityMarksFor(sf, findings);
             const firstFindingId = firstFindingIdFor(sf, findings);
+            // Hint text comes from the Brief's `core_summaries` (per-file AI-generated
+            // pseudocode summary), never from the SmartDiff wire's `pseudocode_summary`
+            // (which stays null — the smart-diff module itself is untouched). Only
+            // core-role files with an available summary render the hint (AC-15/AC-17).
+            const summary = role === "core" ? coreSummaries[sf.path] : undefined;
             return (
-              <FileCard
-                key={sf.path}
-                file={file}
-                marksByLine={marksByLine}
-                findingCount={sf.finding_lines.length}
-                findingsLabel={
-                  sf.finding_lines.length > 0
-                    ? t("smartDiff.findingsBadge", { n: sf.finding_lines.length })
-                    : undefined
-                }
-                onFindingsBadgeClick={firstFindingId ? () => onNavigateToFinding(firstFindingId) : undefined}
-                summary={sf.pseudocode_summary ?? undefined}
-                summaryLabel={summaryLabel}
-                summaryChipLabel={summaryChipLabel}
-                severityLabels={severityLabels}
-              />
+              // Anchor for line-target navigation (T10 focus/ref click-through): the
+              // first marked finding line inside this file is scrolled/highlighted by
+              // FileCard already; this wrapper id gives an external file-level target
+              // (`file-<path>`) until a finer file:line anchor convention is agreed.
+              <div key={sf.path} id={`file-${sf.path}`}>
+                <FileCard
+                  file={file}
+                  marksByLine={marksByLine}
+                  findingCount={sf.finding_lines.length}
+                  findingsLabel={
+                    sf.finding_lines.length > 0
+                      ? t("smartDiff.findingsBadge", { n: sf.finding_lines.length })
+                      : undefined
+                  }
+                  onFindingsBadgeClick={firstFindingId ? () => onNavigateToFinding(firstFindingId) : undefined}
+                  summary={summary}
+                  summaryLabel={summaryLabel}
+                  summaryChipLabel={summaryChipLabel}
+                  severityLabels={severityLabels}
+                />
+              </div>
             );
           })}
         </div>
@@ -171,15 +186,27 @@ export function SmartDiffViewer({
   files,
   smartDiff,
   findings,
+  prId,
 }: {
   files: PrFile[];
   smartDiff: SmartDiff;
   findings: FindingRecord[];
+  /** Needed to look up the already-cached Brief's `core_summaries` (per-file AI
+      hint for core files). Omitted (no prId) simply renders no hints. */
+  prId?: string | null;
 }) {
   const t = useTranslations("shell");
+  const tBrief = useTranslations("brief-card");
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
+
+  // Brief is already fetched/cached by useBrief elsewhere on the PR page (e.g.
+  // PrBriefCard) — TanStack Query dedupes this by query key, so this is not a
+  // second network fetch on top of an existing one. The SmartDiff response
+  // itself is fetched exactly once, by the parent (DiffTab).
+  const { data: brief } = useBrief(prId);
+  const coreSummaries = brief && "core_summaries" in brief ? brief.core_summaries : {};
 
   // Findings badge → Findings tab, deep-linked to the specific finding.
   const navigateToFinding = React.useCallback(
@@ -208,7 +235,9 @@ export function SmartDiffViewer({
   );
 
   const summaryLabel = t("smartDiff.whatThisDoes");
-  const summaryChipLabel = t("smartDiff.summaryChip");
+  // AI-generated labelling (R13/ASI09): the hint text is Brief-sourced LLM
+  // output, not smart-diff's own static data — the chip must say so.
+  const summaryChipLabel = tBrief("aiGenerated");
 
   if (smartDiff.groups.every((g) => g.files.length === 0)) {
     return <div style={{ padding: 24, fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{t("smartDiff.empty")}</div>;
@@ -265,6 +294,7 @@ export function SmartDiffViewer({
           severityLabels={severityLabels}
           summaryLabel={summaryLabel}
           summaryChipLabel={summaryChipLabel}
+          coreSummaries={coreSummaries}
           onNavigateToFinding={navigateToFinding}
         />
       ))}

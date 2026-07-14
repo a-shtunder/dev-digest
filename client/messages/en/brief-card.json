@@ -1,0 +1,20 @@
+{
+  "whatLabel": "What",
+  "whyLabel": "Why",
+  "riskLevel": {
+    "label": "Risk level",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical"
+  },
+  "reviewFocus": {
+    "title": "Review focus — read these first"
+  },
+  "empty": "No brief available yet for this PR.",
+  "generate": "Generate brief",
+  "loading": "Generating brief…",
+  "error": "Failed to load the brief.",
+  "retry": "Retry",
+  "aiGenerated": "AI-generated"
+}

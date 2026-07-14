@@ -87,7 +87,7 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
           {t("smartDiff.loading")}
         </div>
       ) : smartDiff ? (
-        <SmartDiffViewer files={files} smartDiff={smartDiff} findings={latestReviewFindings} />
+        <SmartDiffViewer files={files} smartDiff={smartDiff} findings={latestReviewFindings} prId={prId} />
       ) : (
         <div style={{ padding: 24, fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>
           {t("smartDiff.empty")}

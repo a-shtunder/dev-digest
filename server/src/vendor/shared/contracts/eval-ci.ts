@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Verdict, Finding } from './findings.js';
+import { Verdict, Finding, Severity, FindingCategory } from './findings.js';
 import { EvalRun, EvalOwnerKind, Conformance, Provider, CiFailOn } from './knowledge.js';
 
 /**
@@ -16,6 +16,17 @@ import { EvalRun, EvalOwnerKind, Conformance, Provider, CiFailOn } from './knowl
 // Eval — case input + persisted run record + dashboard
 // ===========================================================================
 
+/** A single finding an eval case expects the reviewer to surface. */
+export const ExpectedFinding = z.object({
+  severity: Severity,
+  category: FindingCategory,
+  title: z.string(),
+  file: z.string(),
+  start_line: z.number().int(),
+  end_line: z.number().int().nullish(),
+});
+export type ExpectedFinding = z.infer<typeof ExpectedFinding>;
+
 /** Create/update payload for an eval case (id + owner resolved by the route). */
 export const EvalCaseInput = z.object({
   owner_kind: EvalOwnerKind,
@@ -24,7 +35,7 @@ export const EvalCaseInput = z.object({
   input_diff: z.string().default(''),
   input_files: z.unknown().nullish(),
   input_meta: z.unknown().nullish(),
-  expected_output: z.unknown(),
+  expected_output: z.array(ExpectedFinding).default([]),
   notes: z.string().nullish(),
 });
 export type EvalCaseInput = z.infer<typeof EvalCaseInput>;
@@ -34,6 +45,7 @@ export const EvalRunRecord = z.object({
   id: z.string(),
   case_id: z.string(),
   case_name: z.string().nullish(),
+  agent_id: z.string().nullish(),
   ran_at: z.string(),
   actual_output: z.unknown(),
   pass: z.boolean().nullable(),
@@ -87,6 +99,26 @@ export const EvalDashboard = z.object({
   alert: z.string().nullable(),
 });
 export type EvalDashboard = z.infer<typeof EvalDashboard>;
+
+/** Per-agent summary row for the eval overview list/table. */
+export const EvalAgentSummary = z.object({
+  agent_id: z.string(),
+  name: z.string(),
+  recall: z.number(),
+  precision: z.number(),
+  citation_accuracy: z.number(),
+  traces_passed: z.number().int(),
+  traces_total: z.number().int(),
+  trend: z.array(EvalTrendPoint),
+});
+export type EvalAgentSummary = z.infer<typeof EvalAgentSummary>;
+
+/** Workspace-wide eval overview: all agents' summaries + recent runs. */
+export const EvalOverview = z.object({
+  agents: z.array(EvalAgentSummary),
+  recent_runs: z.array(EvalRunRecord),
+});
+export type EvalOverview = z.infer<typeof EvalOverview>;
 
 // ===========================================================================
 // Compose Review

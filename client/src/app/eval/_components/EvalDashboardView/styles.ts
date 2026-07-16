@@ -1,0 +1,100 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for EvalDashboardView + AgentSummaryCard + AgentDrillIn. */
+export const s = {
+  page: { padding: "24px 32px 44px", maxWidth: 1100, margin: "0 auto" } satisfies CSSProperties,
+  header: { marginBottom: 20 } satisfies CSSProperties,
+  h1: { fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" } satisfies CSSProperties,
+  subtitle: { fontSize: 14, color: "var(--text-secondary)", marginTop: 4 } satisfies CSSProperties,
+  grid: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    marginBottom: 28,
+  } satisfies CSSProperties,
+  card: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+  } satisfies CSSProperties,
+  cardHeader: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    flex: 1,
+    minWidth: 0,
+  } satisfies CSSProperties,
+  cardTitle: { fontSize: 14, fontWeight: 600 } satisfies CSSProperties,
+  cardMetrics: {
+    display: "flex",
+    alignItems: "center",
+    gap: 24,
+  } satisfies CSSProperties,
+  cardMetric: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 2,
+    minWidth: 46,
+  } satisfies CSSProperties,
+  cardMetricLabel: {
+    fontSize: 10.5,
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  cardMetricValue: { fontSize: 16, fontWeight: 700 } satisfies CSSProperties,
+  cardFooter: {
+    fontSize: 12,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
+  cardChevron: {
+    color: "var(--text-muted)",
+    flexShrink: 0,
+  } satisfies CSSProperties,
+  cardEmpty: {
+    fontSize: 13,
+    color: "var(--text-muted)",
+    padding: "10px 0 2px",
+  } satisfies CSSProperties,
+  trClickable: { cursor: "pointer" } satisfies CSSProperties,
+  trHighlighted: {
+    cursor: "pointer",
+    background: "var(--bg-hover)",
+    outline: "1px solid var(--accent)",
+    outlineOffset: -1,
+  } satisfies CSSProperties,
+  sectionTitle: { fontSize: 15, fontWeight: 700, marginBottom: 10 } satisfies CSSProperties,
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 } satisfies CSSProperties,
+  th: {
+    textAlign: "left",
+    padding: "8px 10px",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.03em",
+    color: "var(--text-muted)",
+    borderBottom: "1px solid var(--border)",
+  } satisfies CSSProperties,
+  td: { padding: "8px 10px", borderBottom: "1px solid var(--border)" } satisfies CSSProperties,
+  drillHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 20,
+  } satisfies CSSProperties,
+  metricsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 14,
+    marginBottom: 24,
+  } satisfies CSSProperties,
+  chartWrap: { marginBottom: 24 } satisfies CSSProperties,
+  compareBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 10,
+    fontSize: 12.5,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
+} as const;

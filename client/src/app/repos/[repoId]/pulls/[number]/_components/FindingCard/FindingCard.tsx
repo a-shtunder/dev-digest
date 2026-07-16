@@ -31,6 +31,8 @@ export function FindingCard({
   pending,
   repoFullName,
   headSha,
+  onCreateEvalCase,
+  evalCasePending,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -39,8 +41,14 @@ export function FindingCard({
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** "Turn into eval case" — wired by FindingsPanel to the one-click create
+   *  mutation. Disabled/hidden when the finding has no accept/dismiss
+   *  decision yet (mirrors the server-side AC-3 guard). */
+  onCreateEvalCase?: () => void;
+  evalCasePending?: boolean;
 }) {
   const t = useTranslations("prReview");
+  const tEval = useTranslations("eval.findingCard");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
   const sevColor = SEV_COLOR[f.severity] ?? SEV_COLOR_FALLBACK;
   const fileHref =
@@ -109,6 +117,17 @@ export function FindingCard({
             >
               {t("finding.dismiss")}
             </Button>
+            {muted && onCreateEvalCase && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon="FlaskConical"
+                loading={evalCasePending}
+                onClick={onCreateEvalCase}
+              >
+                {evalCasePending ? tEval("creating") : tEval("turnIntoEvalCase")}
+              </Button>
+            )}
           </div>
         </div>
       )}

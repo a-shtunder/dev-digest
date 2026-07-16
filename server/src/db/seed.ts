@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createDb, type Db } from "./client.js";
 import * as t from "./schema.js";
 import { eq, and } from "drizzle-orm";
+import type { ExpectedFinding } from "@devdigest/shared";
 
 /**
  * Seed the starter's demo data. Idempotent: re-running upserts the default
@@ -170,7 +171,7 @@ export async function seed(
         severity: "CRITICAL",
         category: "security",
         title: "Hardcoded Stripe secret key in commit",
-        rationale: "Line 12 contains a literal `sk_live_` Stripe secret key.",
+        rationale: "Line 12 contains a literal Stripe secret key.",
         suggestion: "Move to env var and rotate the key immediately.",
         confidence: 0.98,
       },
@@ -1074,6 +1075,231 @@ For each finding cite the exact file:line and suggest a backwards-compatible alt
           .insert(t.agentSkills)
           .values({ agentId: apiAgent!.id, skillId, order: i })
           .onConflictDoNothing();
+      }
+    }
+  }
+
+  // ---- eval cases (>=8 regression cases bound to General Reviewer) ----
+  // Idempotency key: (owner_id, name) — re-running db:seed must not duplicate.
+  const [generalReviewer] = await db
+    .select()
+    .from(t.agents)
+    .where(
+      and(
+        eq(t.agents.workspaceId, workspaceId),
+        eq(t.agents.name, "General Reviewer"),
+      ),
+    );
+
+  if (generalReviewer) {
+    const ownerId = generalReviewer.id;
+
+    const hardcodedSecretDiff = [
+      "diff --git a/src/config.ts b/src/config.ts",
+      "--- a/src/config.ts",
+      "+++ b/src/config.ts",
+      "@@ -9,3 +9,4 @@",
+      " export const config = {",
+      "   apiBase: 'https://api.acme.dev',",
+      "+  stripeSecretKey: 'REDACTED_STRIPE_SECRET_DO_NOT_USE',",
+      " };",
+    ].join("\n");
+
+    const n1QueryDiff = [
+      "diff --git a/src/api/users.ts b/src/api/users.ts",
+      "--- a/src/api/users.ts",
+      "+++ b/src/api/users.ts",
+      "@@ -43,6 +43,10 @@ export async function listUserOrders(userIds: string[]) {",
+      "   const results = [];",
+      "+  for (const id of userIds) {",
+      "+    const orders = await db.orders.findMany({ where: { userId: id } });",
+      "+    results.push(...orders);",
+      "+  }",
+      "   return results;",
+      " }",
+    ].join("\n");
+
+    const nullDerefDiff = [
+      "diff --git a/src/payments/ledger.ts b/src/payments/ledger.ts",
+      "--- a/src/payments/ledger.ts",
+      "+++ b/src/payments/ledger.ts",
+      "@@ -18,4 +18,6 @@ export function summarize(account: Account | null) {",
+      "-  return account.balance;",
+      "+  return account.balance.toFixed(2);",
+      " }",
+    ].join("\n");
+
+    const sqlInjectionDiff = [
+      "diff --git a/src/api/search.ts b/src/api/search.ts",
+      "--- a/src/api/search.ts",
+      "+++ b/src/api/search.ts",
+      "@@ -5,3 +5,6 @@ export async function search(term: string) {",
+      "   const client = getClient();",
+      "+  return client.query(",
+      "+    `SELECT * FROM items WHERE name LIKE '%${term}%'`,",
+      "+  );",
+      " }",
+    ].join("\n");
+
+    // Cases with a small, correct, well-tested change — expected_output = []
+    // (dismissed-provenance: no finding should be raised against these diffs).
+    const readmeTypoDiff = [
+      "diff --git a/README.md b/README.md",
+      "--- a/README.md",
+      "+++ b/README.md",
+      "@@ -1,3 +1,3 @@",
+      " # payments-api",
+      "-Handles paymnet processing for acme.",
+      "+Handles payment processing for acme.",
+    ].join("\n");
+
+    const addConstantDiff = [
+      "diff --git a/src/constants.ts b/src/constants.ts",
+      "--- a/src/constants.ts",
+      "+++ b/src/constants.ts",
+      "@@ -2,3 +2,4 @@",
+      " export const MAX_RETRIES = 3;",
+      " export const TIMEOUT_MS = 5000;",
+      "+export const DEFAULT_PAGE_SIZE = 20;",
+    ].join("\n");
+
+    const clarifyingCommentDiff = [
+      "diff --git a/src/payments/retry-queue.ts b/src/payments/retry-queue.ts",
+      "--- a/src/payments/retry-queue.ts",
+      "+++ b/src/payments/retry-queue.ts",
+      "@@ -6,3 +6,5 @@ export class RetryQueue {",
+      "   enqueue(event: WebhookEvent) {",
+      "+    // events are processed FIFO by drain()",
+      "     this.pending.push(event);",
+      "   }",
+    ].join("\n");
+
+    const addedTestDiff = [
+      "diff --git a/src/payments/ledger.test.ts b/src/payments/ledger.test.ts",
+      "--- a/src/payments/ledger.test.ts",
+      "+++ b/src/payments/ledger.test.ts",
+      "@@ -10,3 +10,8 @@ describe('Ledger', () => {",
+      "   it('records an entry', () => { ... });",
+      "+",
+      "+  it('rejects a negative amount', () => {",
+      "+    expect(() => ledger.record(account, -5)).toThrow();",
+      "+  });",
+      " });",
+    ].join("\n");
+
+    type SeedEvalCase = {
+      name: string;
+      input_diff: string;
+      expected_output: ExpectedFinding[];
+      notes: string;
+    };
+
+    const seedEvalCases: SeedEvalCase[] = [
+      {
+        name: "eval: hardcoded Stripe secret key",
+        input_diff: hardcodedSecretDiff,
+        expected_output: [
+          {
+            severity: "CRITICAL",
+            category: "security",
+            title: "Hardcoded Stripe secret key",
+            file: "src/config.ts",
+            start_line: 12,
+            end_line: 12,
+          },
+        ],
+        notes: "Accepted-provenance regression case: a config change introducing a literal secret.",
+      },
+      {
+        name: "eval: N+1 query in listUserOrders",
+        input_diff: n1QueryDiff,
+        expected_output: [
+          {
+            severity: "WARNING",
+            category: "perf",
+            title: "N+1 query in listUserOrders",
+            file: "src/api/users.ts",
+            start_line: 45,
+            end_line: 47,
+          },
+        ],
+        notes: "Accepted-provenance regression case: a per-id query issued inside a loop.",
+      },
+      {
+        name: "eval: null dereference on account.balance",
+        input_diff: nullDerefDiff,
+        expected_output: [
+          {
+            severity: "WARNING",
+            category: "bug",
+            title: "Possible null dereference on account.balance",
+            file: "src/payments/ledger.ts",
+            start_line: 19,
+            end_line: 19,
+          },
+        ],
+        notes: "Accepted-provenance regression case: account is typed Account | null but accessed without a guard.",
+      },
+      {
+        name: "eval: SQL injection via template literal",
+        input_diff: sqlInjectionDiff,
+        expected_output: [
+          {
+            severity: "CRITICAL",
+            category: "security",
+            title: "SQL injection via unescaped template literal",
+            file: "src/api/search.ts",
+            start_line: 7,
+            end_line: 9,
+          },
+        ],
+        notes: "Accepted-provenance regression case: user-controlled term interpolated directly into a SQL string.",
+      },
+      {
+        name: "eval: README typo fix",
+        input_diff: readmeTypoDiff,
+        expected_output: [],
+        notes: "Dismissed-provenance regression case: a trivial doc fix with no code-behaviour change.",
+      },
+      {
+        name: "eval: add DEFAULT_PAGE_SIZE constant",
+        input_diff: addConstantDiff,
+        expected_output: [],
+        notes: "Dismissed-provenance regression case: an additive, unused-elsewhere constant.",
+      },
+      {
+        name: "eval: clarifying comment in RetryQueue.enqueue",
+        input_diff: clarifyingCommentDiff,
+        expected_output: [],
+        notes: "Dismissed-provenance regression case: a comment-only change with no behavioural impact.",
+      },
+      {
+        name: "eval: add negative-amount test to ledger",
+        input_diff: addedTestDiff,
+        expected_output: [],
+        notes: "Dismissed-provenance regression case: a new test asserting existing guard behaviour.",
+      },
+    ];
+
+    for (const c of seedEvalCases) {
+      const [existingCase] = await db
+        .select()
+        .from(t.evalCases)
+        .where(
+          and(eq(t.evalCases.ownerId, ownerId), eq(t.evalCases.name, c.name)),
+        );
+      if (!existingCase) {
+        await db.insert(t.evalCases).values({
+          workspaceId,
+          ownerKind: "agent",
+          ownerId,
+          name: c.name,
+          inputDiff: c.input_diff,
+          inputFiles: null,
+          inputMeta: null,
+          expectedOutput: c.expected_output,
+          notes: c.notes,
+        });
       }
     }
   }

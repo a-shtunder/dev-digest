@@ -3,6 +3,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
+import evalMessages from "../../../../../../../../messages/en/eval.json";
 import { FindingCard } from "./FindingCard";
 
 afterEach(cleanup);
@@ -28,7 +29,10 @@ const FINDING: FindingRecord = {
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+    <NextIntlClientProvider
+      locale="en"
+      messages={{ prReview: messages, eval: evalMessages }}
+    >
       {ui}
     </NextIntlClientProvider>,
   );
@@ -56,5 +60,24 @@ describe("FindingCard (smoke, both themes)", () => {
     expect(onAction).toHaveBeenCalledWith("accept");
     fireEvent.click(screen.getByText("Dismiss"));
     expect(onAction).toHaveBeenCalledWith("dismiss");
+  });
+
+  it("shows 'Turn into eval case' only for a decided finding and fires the callback on click", () => {
+    const onCreateEvalCase = vi.fn();
+    const undecided = renderWithIntl(
+      <FindingCard f={FINDING} defaultExpanded onAction={() => {}} onCreateEvalCase={onCreateEvalCase} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /turn into eval case/i }),
+    ).not.toBeInTheDocument();
+    undecided.unmount();
+
+    const decided = { ...FINDING, accepted_at: "2026-07-15T00:00:00Z" };
+    renderWithIntl(
+      <FindingCard f={decided} defaultExpanded onAction={() => {}} onCreateEvalCase={onCreateEvalCase} />,
+    );
+    const evalButton = screen.getByRole("button", { name: /turn into eval case/i });
+    fireEvent.click(evalButton);
+    expect(onCreateEvalCase).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,6 +9,15 @@
     "metricTrend": "Metric trend",
     "recentRuns": "Recent runs",
     "noRuns": "No runs yet. Create an eval case and run it.",
+    "overviewSubtitle": "Recall, precision, and citation accuracy across your review agents",
+    "noAgents": "No review agents yet. Create an agent to start tracking eval metrics.",
+    "agentEmptyRuns": "No runs yet",
+    "back": "← Back to all agents",
+    "runSet": "Run eval set",
+    "runningSet": "Running…",
+    "selectTwoToCompare": "Select two runs to compare",
+    "compareSelected": "Compare selected",
+    "tracesSummary": "{passed}/{total} traces passed",
     "metrics": {
       "recall": "RECALL",
       "precision": "PRECISION",
@@ -28,40 +37,66 @@
       "cost": "Cost"
     },
     "pass": "pass",
-    "fail": "fail"
+    "fail": "fail",
+    "compareRuns": {
+      "title": "Compare runs",
+      "subtitle": "{a} vs {b}",
+      "close": "Close",
+      "promote": "Promote",
+      "promoting": "Running…",
+      "promoted": "New run started. Refresh the dashboard to see it in Recent runs.",
+      "promoteError": "Could not start the re-run. Try again.",
+      "promoteNote": "Re-runs the eval set against the agent's current prompt — this does not activate a version.",
+      "promptDiffTitle": "System prompt diff",
+      "noSnapshot": "Prompt snapshot not available for one of these runs — diff omitted.",
+      "metrics": {
+        "recall": "Recall",
+        "precision": "Precision",
+        "citationAccuracy": "Citation accuracy"
+      }
+    }
   },
   "caseEditor": {
     "newCase": "New eval case",
     "caseTitle": "Eval case · {name}",
+    "subtitle": "{agent} · simulate a PR and assert the expected output",
     "runCase": "Run case",
     "running": "Running…",
     "save": "Save",
     "saving": "Saving…",
+    "cancel": "Cancel",
+    "runOnSave": "Run on save",
     "nameLabel": "Name",
     "namePlaceholder": "stripe-key-leak",
     "inputLabel": "Input",
     "tabs": {
       "diff": "Diff",
+      "files": "Files",
       "prMeta": "PR meta"
     },
-    "diffPlaceholder": "--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,6 +10,7 @@\n+  stripeKey: \"sk_live_...\"",
+    "diffPlaceholder": "--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,6 +10,7 @@\n+  stripeKey: \"REDACTED_STRIPE_SECRET_DO_NOT_USE\"",
+    "filesPlaceholder": "[{\"path\": \"src/config.ts\", \"content\": \"...\"}]",
     "titleLabel": "Title",
     "titlePlaceholder": "Add Stripe integration",
     "bodyLabel": "Body",
     "bodyPlaceholder": "Wire up payments via Stripe SDK.",
     "preview": "Preview",
     "expectedOutput": "Expected output",
+    "addSkeleton": "+ Finding skeleton",
     "validJson": "valid JSON",
     "invalidJson": "invalid JSON",
     "lastRunPassed": "Last run passed",
     "lastRunFailed": "Last run failed",
-    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s"
+    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s",
+    "statusDetails": "expected {expected} finding, got {got} · {duration} · {cost}"
   },
   "evalsTab": {
     "metricsTitle": "Eval metrics",
     "metricsSubtitle": "Recall / Precision / Citation for this agent's eval cases",
+    "runAll": "Run all evals",
+    "runningAll": "Running…",
     "casesHeading": "Eval cases",
-    "newCase": "New case",
+    "newCase": "New eval case",
     "loadingCases": "Loading cases…",
     "emptyCases": "No eval cases yet. Create one to assert this agent's expected findings on a sample diff.",
     "neverRun": "never run",
@@ -80,5 +115,11 @@
     "crumbEvals": "Evals",
     "crumbNewCase": "New case",
     "crumbEvalCase": "Eval case"
+  },
+  "findingCard": {
+    "turnIntoEvalCase": "Turn into eval case",
+    "creating": "Creating…",
+    "createdToast": "Eval case created",
+    "errorToast": "Couldn't create eval case"
   }
 }

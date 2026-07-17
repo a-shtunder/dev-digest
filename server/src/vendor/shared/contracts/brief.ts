@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * PR Brief building blocks: Intent, Blast radius, Risks, Smart Diff.
+ * PR Brief building blocks: Intent, Blast radius, Risks, PR history, Smart Diff.
  */
 
 // ---- Intent ----
@@ -59,6 +59,22 @@ export const Risks = z.object({
   risks: z.array(Risk),
 });
 export type Risks = z.infer<typeof Risks>;
+
+// ---- PR history ----
+export const PrHistoryEntry = z.object({
+  pr_number: z.number().int(),
+  title: z.string(),
+  merged_at: z.string(),
+  author: z.string(),
+  files_overlap: z.array(z.string()),
+  notes: z.string(),
+});
+export type PrHistoryEntry = z.infer<typeof PrHistoryEntry>;
+
+export const PrHistory = z.object({
+  history: z.array(PrHistoryEntry),
+});
+export type PrHistory = z.infer<typeof PrHistory>;
 
 // ---- Smart Diff ----
 export const SmartDiffRole = z.enum(['core', 'wiring', 'boilerplate']);

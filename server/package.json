@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "verify:l03": "vitest run smart-diff contracts --exclude '**/*.it.test.ts' && pnpm typecheck",
+    "verify:l06": "vitest run eval contracts --exclude '**/*.it.test.ts' && pnpm typecheck",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "db:seed-demo": "tsx src/db/seed-demo-runs.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.33.1",

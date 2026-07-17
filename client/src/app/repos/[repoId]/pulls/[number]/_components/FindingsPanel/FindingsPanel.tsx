@@ -8,6 +8,8 @@ import { Toggle, EmptyState, SEV, Icon } from "@devdigest/ui";
 import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
+import { useCreateEvalCaseFromFinding } from "../../../../../../../lib/hooks/eval";
+import { useToast } from "../../../../../../../lib/contexts/toast";
 import { KEY_TO_ACTION, SEVERITY_FILTERS } from "./constants";
 import { visibleFindings } from "./helpers";
 import { s } from "./styles";
@@ -28,7 +30,10 @@ export function FindingsPanel({
   targetFindingId?: string | null;
 }) {
   const t = useTranslations("prReview");
+  const tEval = useTranslations("eval.findingCard");
   const action = useFindingAction();
+  const toast = useToast();
+  const createEvalCase = useCreateEvalCaseFromFinding();
   const [hideLow, setHideLow] = React.useState(false);
   const [activeSeverity, setActiveSeverity] = React.useState<Severity | null>(
     null,
@@ -129,6 +134,15 @@ export function FindingsPanel({
               headSha={headSha}
               onAction={(act) =>
                 action.mutate({ findingId: f.id, action: act, prId })
+              }
+              evalCasePending={
+                createEvalCase.isPending && createEvalCase.variables === f.id
+              }
+              onCreateEvalCase={() =>
+                createEvalCase.mutate(f.id, {
+                  onSuccess: () => toast.success(tEval("createdToast")),
+                  onError: () => toast.error(tEval("errorToast")),
+                })
               }
             />
           ))

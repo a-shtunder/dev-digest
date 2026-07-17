@@ -2,10 +2,21 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
-import messages from "../../../../../../../../messages/en/prReview.json";
+import prReviewMessages from "../../../../../../../../messages/en/prReview.json";
+import evalMessages from "../../../../../../../../messages/en/eval.json";
+import { ToastProvider } from "../../../../../../../lib/contexts/toast";
 
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
   useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+const createEvalCaseMutate = vi.fn();
+vi.mock("../../../../../../../lib/hooks/eval", () => ({
+  useCreateEvalCaseFromFinding: () => ({
+    mutate: createEvalCaseMutate,
+    isPending: false,
+    variables: undefined,
+  }),
 }));
 
 import { FindingsPanel } from "./FindingsPanel";
@@ -35,8 +46,11 @@ const FINDINGS: FindingRecord[] = [
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      {ui}
+    <NextIntlClientProvider
+      locale="en"
+      messages={{ prReview: prReviewMessages, eval: evalMessages }}
+    >
+      <ToastProvider>{ui}</ToastProvider>
     </NextIntlClientProvider>,
   );
 }
@@ -74,5 +88,31 @@ describe("FindingsPanel (smoke)", () => {
     // Click again → reset
     fireEvent.click(screen.getByRole("button", { name: /critical/i }));
     expect(screen.getByText("Warn finding")).toBeInTheDocument();
+  });
+
+  it("shows 'Turn into eval case' only for a decided finding, fires the create mutation, and shows toast feedback", () => {
+    createEvalCaseMutate.mockImplementation((_findingId, options) => {
+      options?.onSuccess?.();
+    });
+
+    const decided: FindingRecord = { ...FINDINGS[0]!, accepted_at: "2026-07-15T00:00:00Z" };
+    renderWithIntl(<FindingsPanel findings={[decided]} prId="pr1" />);
+
+    const evalButton = screen.getByRole("button", { name: /turn into eval case/i });
+    expect(evalButton).toBeInTheDocument();
+
+    fireEvent.click(evalButton);
+    expect(createEvalCaseMutate).toHaveBeenCalledWith(
+      "f1",
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(screen.getByText("Eval case created")).toBeInTheDocument();
+  });
+
+  it("hides 'Turn into eval case' for an undecided finding", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
+    expect(
+      screen.queryByRole("button", { name: /turn into eval case/i }),
+    ).not.toBeInTheDocument();
   });
 });
